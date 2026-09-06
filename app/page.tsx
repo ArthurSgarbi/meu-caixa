@@ -17,6 +17,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   LoaderCircle,
+  Pencil,
   PiggyBank,
   Plus,
   ReceiptText,
@@ -27,6 +28,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   NativeSelect,
   NativeSelectOption,
@@ -77,6 +86,8 @@ type CreateTransactionInput = {
   transactionDate: string;
   categoryId: number;
 };
+
+type UpdateTransactionInput = CreateTransactionInput & { id: number };
 
 declare global {
   interface Document {
@@ -138,6 +149,10 @@ function formatCurrency(cents: number) {
   return currencyFormatter.format(cents / 100);
 }
 
+function formatCurrencyInput(cents: number) {
+  return (cents / 100).toFixed(2).replace('.', ',');
+}
+
 function parseCurrencyToCents(value: string) {
   const normalized = value.includes(',')
     ? value
@@ -162,6 +177,20 @@ async function createTransaction(input: CreateTransactionInput) {
   const result = (await response.json()) as { id?: number; error?: string };
   if (!response.ok)
     throw new Error(result.error ?? 'Não foi possível registrar a transação.');
+  return result;
+}
+
+async function updateTransaction(input: UpdateTransactionInput) {
+  const response = await fetch('/api/transactions', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const result = (await response.json()) as { id?: number; error?: string };
+  if (!response.ok)
+    throw new Error(
+      result.error ?? 'Não foi possível salvar as alterações da transação.',
+    );
   return result;
 }
 
@@ -192,6 +221,12 @@ export default function Home() {
   const [error, setError] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
   const [categoryId, setCategoryId] = useState('');
+  const [editingTransaction, setEditingTransaction] =
+    useState<Transaction | null>(null);
+  const [editType, setEditType] = useState<TransactionType>('expense');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const loadData = useCallback(
     async (selectedMonth: string, signal?: AbortSignal) => {
@@ -245,6 +280,19 @@ export default function Home() {
     ? categoryId
     : availableCategories[0]
       ? String(availableCategories[0].id)
+      : '';
+
+  const editCategories = useMemo(
+    () => data.categories.filter((category) => category.type === editType),
+    [data.categories, editType],
+  );
+
+  const selectedEditCategoryId = editCategories.some(
+    (category) => String(category.id) === editCategoryId,
+  )
+    ? editCategoryId
+    : editCategories[0]
+      ? String(editCategories[0].id)
       : '';
 
   useEffect(() => {
@@ -334,6 +382,48 @@ export default function Home() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  function openTransactionEditor(transaction: Transaction) {
+    setEditingTransaction(transaction);
+    setEditType(transaction.type);
+    setEditCategoryId(String(transaction.categoryId));
+    setEditError('');
+  }
+
+  async function handleEditSubmit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingTransaction) return;
+
+    const form = new FormData(event.currentTarget);
+    const input: UpdateTransactionInput = {
+      id: editingTransaction.id,
+      description: formString(form.get('editDescription')).trim(),
+      type: editType,
+      amountCents: parseCurrencyToCents(formString(form.get('editAmount'))),
+      transactionDate: formString(form.get('editTransactionDate')),
+      categoryId: Number(selectedEditCategoryId),
+    };
+
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await updateTransaction(input);
+      setEditingTransaction(null);
+      setMessage('Alterações da transação salvas no banco de dados.');
+      setError('');
+      const editedMonth = input.transactionDate.slice(0, 7);
+      if (editedMonth !== month) setMonth(editedMonth);
+      else await loadData(month);
+    } catch (requestError) {
+      setEditError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível salvar as alterações da transação.',
+      );
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -617,6 +707,9 @@ export default function Home() {
                         <TableHead>Descrição</TableHead>
                         <TableHead>Categoria</TableHead>
                         <TableHead className="pr-5 text-right">Valor</TableHead>
+                        <TableHead className="w-12 pr-5">
+                          <span className="sr-only">Ações</span>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -638,10 +731,21 @@ export default function Home() {
                             </Badge>
                           </TableCell>
                           <TableCell
-                            className={`pr-5 text-right font-semibold tabular-nums ${transaction.type === 'income' ? 'text-emerald-700' : 'text-slate-800'}`}
+                            className={`text-right font-semibold tabular-nums ${transaction.type === 'income' ? 'text-emerald-700' : 'text-slate-800'}`}
                           >
                             {transaction.type === 'expense' ? '− ' : '+ '}
                             {formatCurrency(transaction.amountCents)}
+                          </TableCell>
+                          <TableCell className="pr-5 text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label={`Editar ${transaction.description}`}
+                              onClick={() => openTransactionEditor(transaction)}
+                            >
+                              <Pencil />
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -651,6 +755,145 @@ export default function Home() {
               </CardContent>
             </Card>
           </div>
+
+          <Dialog
+            open={editingTransaction !== null}
+            onOpenChange={(open) => {
+              if (!open && !editSaving) setEditingTransaction(null);
+            }}
+          >
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Editar transação</DialogTitle>
+                <DialogDescription>
+                  Ao salvar, o resumo do mês também será recalculado.
+                </DialogDescription>
+              </DialogHeader>
+              {editingTransaction && (
+                <form
+                  key={editingTransaction.id}
+                  className="space-y-4"
+                  onSubmit={handleEditSubmit}
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">Descrição</Label>
+                    <Input
+                      id="edit-description"
+                      name="editDescription"
+                      required
+                      minLength={2}
+                      maxLength={120}
+                      defaultValue={editingTransaction.description}
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-type">Tipo</Label>
+                      <NativeSelect
+                        id="edit-type"
+                        value={editType}
+                        onChange={(event) => {
+                          const nextType = event.target
+                            .value as TransactionType;
+                          setEditType(nextType);
+                          const firstCategory = data.categories.find(
+                            (category) => category.type === nextType,
+                          );
+                          setEditCategoryId(
+                            firstCategory ? String(firstCategory.id) : '',
+                          );
+                        }}
+                        className="w-full"
+                      >
+                        <NativeSelectOption value="expense">
+                          Despesa
+                        </NativeSelectOption>
+                        <NativeSelectOption value="income">
+                          Receita
+                        </NativeSelectOption>
+                      </NativeSelect>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-amount">Valor</Label>
+                      <Input
+                        id="edit-amount"
+                        name="editAmount"
+                        required
+                        inputMode="decimal"
+                        defaultValue={formatCurrencyInput(
+                          editingTransaction.amountCents,
+                        )}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-category">Categoria</Label>
+                      <NativeSelect
+                        id="edit-category"
+                        required
+                        value={selectedEditCategoryId}
+                        onChange={(event) =>
+                          setEditCategoryId(event.target.value)
+                        }
+                        className="w-full"
+                      >
+                        {editCategories.map((category) => (
+                          <NativeSelectOption
+                            key={category.id}
+                            value={String(category.id)}
+                          >
+                            {category.name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-transaction-date">Data</Label>
+                      <Input
+                        id="edit-transaction-date"
+                        name="editTransactionDate"
+                        type="date"
+                        required
+                        defaultValue={editingTransaction.transactionDate}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {editError && (
+                    <output
+                      aria-live="polite"
+                      className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700"
+                    >
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      {editError}
+                    </output>
+                  )}
+
+                  <DialogFooter className="mx-0 mb-0 -mr-4 -ml-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={editSaving}
+                      onClick={() => setEditingTransaction(null)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={editSaving || !selectedEditCategoryId}
+                    >
+                      {editSaving && <LoaderCircle className="animate-spin" />}
+                      {editSaving ? 'Salvando...' : 'Salvar alterações'}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              )}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="investments">

@@ -16,6 +16,7 @@ import {
   BriefcaseBusiness,
   CircleDollarSign,
   LoaderCircle,
+  Pencil,
   Plus,
   TrendingUp,
 } from 'lucide-react';
@@ -24,6 +25,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, type ChartConfig } from '@/components/ui/chart';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -103,6 +112,10 @@ function formatCurrency(cents: number) {
   return currencyFormatter.format(cents / 100);
 }
 
+function formatCurrencyInput(cents: number) {
+  return (cents / 100).toFixed(2).replace('.', ',');
+}
+
 function parseCurrencyToCents(value: string) {
   const normalized = value.includes(',')
     ? value
@@ -132,6 +145,11 @@ export function InvestmentsPanel() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [editingInvestment, setEditingInvestment] = useState<Investment | null>(
+    null,
+  );
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const loadInvestments = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -224,6 +242,54 @@ export function InvestmentsPanel() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEditSubmit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingInvestment) return;
+
+    const form = new FormData(event.currentTarget);
+    const payload = {
+      id: editingInvestment.id,
+      name: formString(form.get('editInvestmentName')).trim(),
+      assetClass: formString(form.get('editAssetClass')),
+      investedCents: parseCurrencyToCents(
+        formString(form.get('editInvestedValue')),
+      ),
+      currentValueCents: parseCurrencyToCents(
+        formString(form.get('editCurrentValue')),
+      ),
+      acquisitionDate: formString(form.get('editAcquisitionDate')),
+    };
+
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const response = await fetch('/api/investments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ??
+            'Não foi possível salvar as alterações do investimento.',
+        );
+      }
+      setEditingInvestment(null);
+      setMessage('Alterações do investimento salvas no banco de dados.');
+      setError('');
+      await loadInvestments();
+    } catch (requestError) {
+      setEditError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível salvar as alterações do investimento.',
+      );
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -521,16 +587,30 @@ export function InvestmentsPanel() {
                             )}
                           </p>
                         </div>
-                        <Badge
-                          className={
-                            result >= 0
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-red-50 text-red-700'
-                          }
-                        >
-                          {result >= 0 ? '+' : '−'}{' '}
-                          {formatCurrency(Math.abs(result))}
-                        </Badge>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Badge
+                            className={
+                              result >= 0
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-red-50 text-red-700'
+                            }
+                          >
+                            {result >= 0 ? '+' : '−'}{' '}
+                            {formatCurrency(Math.abs(result))}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Editar ${investment.name}`}
+                            onClick={() => {
+                              setEditingInvestment(investment);
+                              setEditError('');
+                            }}
+                          >
+                            <Pencil />
+                          </Button>
+                        </div>
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-3">
                         <div>
@@ -553,6 +633,126 @@ export function InvestmentsPanel() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={editingInvestment !== null}
+        onOpenChange={(open) => {
+          if (!open && !editSaving) setEditingInvestment(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar investimento</DialogTitle>
+            <DialogDescription>
+              O patrimônio, o resultado e o gráfico serão recalculados ao
+              salvar.
+            </DialogDescription>
+          </DialogHeader>
+          {editingInvestment && (
+            <form
+              key={editingInvestment.id}
+              className="space-y-4"
+              onSubmit={handleEditSubmit}
+            >
+              <div className="space-y-2">
+                <Label htmlFor="edit-investment-name">Nome do ativo</Label>
+                <Input
+                  id="edit-investment-name"
+                  name="editInvestmentName"
+                  required
+                  minLength={2}
+                  maxLength={80}
+                  defaultValue={editingInvestment.name}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-asset-class">Classe</Label>
+                <NativeSelect
+                  id="edit-asset-class"
+                  name="editAssetClass"
+                  defaultValue={editingInvestment.assetClass}
+                  className="w-full"
+                >
+                  {assetClasses.map((assetClass) => (
+                    <NativeSelectOption key={assetClass} value={assetClass}>
+                      {assetClass}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-invested-value">Valor aplicado</Label>
+                  <Input
+                    id="edit-invested-value"
+                    name="editInvestedValue"
+                    required
+                    inputMode="decimal"
+                    defaultValue={formatCurrencyInput(
+                      editingInvestment.investedCents,
+                    )}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-current-value">Valor atual</Label>
+                  <Input
+                    id="edit-current-value"
+                    name="editCurrentValue"
+                    required
+                    inputMode="decimal"
+                    defaultValue={formatCurrencyInput(
+                      editingInvestment.currentValueCents,
+                    )}
+                    className="h-11"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-acquisition-date">Data da aplicação</Label>
+                <Input
+                  id="edit-acquisition-date"
+                  name="editAcquisitionDate"
+                  type="date"
+                  required
+                  defaultValue={editingInvestment.acquisitionDate}
+                  className="h-11"
+                />
+              </div>
+
+              {editError && (
+                <output
+                  aria-live="polite"
+                  className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  {editError}
+                </output>
+              )}
+
+              <DialogFooter className="mx-0 mb-0 -mr-4 -ml-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={editSaving}
+                  onClick={() => setEditingInvestment(null)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={editSaving}
+                  className="bg-violet-700 text-white hover:bg-violet-600"
+                >
+                  {editSaving && <LoaderCircle className="animate-spin" />}
+                  {editSaving ? 'Salvando...' : 'Salvar alterações'}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

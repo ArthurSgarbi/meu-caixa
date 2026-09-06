@@ -16,6 +16,57 @@ const categorySeeds = [
 
 type TransactionType = 'income' | 'expense';
 
+type TransactionInput = {
+  description: string;
+  type: TransactionType;
+  amountCents: number;
+  transactionDate: string;
+  categoryId: number;
+};
+
+function parseTransactionInput(
+  body: Record<string, unknown>,
+): { input: TransactionInput } | { error: string } {
+  const description =
+    typeof body.description === 'string' ? body.description.trim() : '';
+  const type = body.type as TransactionType;
+  const amountCents = Number(body.amountCents);
+  const transactionDate =
+    typeof body.transactionDate === 'string' ? body.transactionDate : '';
+  const categoryId = Number(body.categoryId);
+
+  if (description.length < 2 || description.length > 120) {
+    return { error: 'Informe uma descrição entre 2 e 120 caracteres.' };
+  }
+  if (!['income', 'expense'].includes(type)) {
+    return { error: 'Selecione um tipo de transação válido.' };
+  }
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+    return { error: 'Informe um valor maior que zero.' };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+    return { error: 'Informe uma data válida.' };
+  }
+  if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
+    return { error: 'Selecione uma categoria válida.' };
+  }
+
+  return {
+    input: { description, type, amountCents, transactionDate, categoryId },
+  };
+}
+
+async function categoryMatchesType(
+  db: D1Database,
+  categoryId: number,
+  type: TransactionType,
+) {
+  return db
+    .prepare('SELECT id FROM categories WHERE id = ? AND type = ?')
+    .bind(categoryId, type)
+    .first();
+}
+
 function getMonthRange(month: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null;
   const [year, monthNumber] = month.split('-').map(Number);
@@ -108,51 +159,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const description =
-      typeof body.description === 'string' ? body.description.trim() : '';
-    const type = body.type as TransactionType;
-    const amountCents = Number(body.amountCents);
-    const transactionDate =
-      typeof body.transactionDate === 'string' ? body.transactionDate : '';
-    const categoryId = Number(body.categoryId);
-
-    if (description.length < 2 || description.length > 120) {
-      return Response.json(
-        { error: 'Informe uma descrição entre 2 e 120 caracteres.' },
-        { status: 400 },
-      );
+    const parsed = parseTransactionInput(body);
+    if ('error' in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
     }
-    if (!['income', 'expense'].includes(type)) {
-      return Response.json(
-        { error: 'Selecione um tipo de transação válido.' },
-        { status: 400 },
-      );
-    }
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
-      return Response.json(
-        { error: 'Informe um valor maior que zero.' },
-        { status: 400 },
-      );
-    }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
-      return Response.json(
-        { error: 'Informe uma data válida.' },
-        { status: 400 },
-      );
-    }
-    if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
-      return Response.json(
-        { error: 'Selecione uma categoria válida.' },
-        { status: 400 },
-      );
-    }
+    const { description, type, amountCents, transactionDate, categoryId } =
+      parsed.input;
 
     const db = getDb();
     await seedCategories(db);
-    const category = await db
-      .prepare('SELECT id FROM categories WHERE id = ? AND type = ?')
-      .bind(categoryId, type)
-      .first();
+    const category = await categoryMatchesType(db, categoryId, type);
 
     if (!category) {
       return Response.json(
@@ -182,6 +198,61 @@ export async function POST(request: Request) {
     console.error('Failed to create transaction', error);
     return Response.json(
       { error: 'Não foi possível registrar a transação.' },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = Number(body.id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return Response.json(
+        { error: 'Transação inválida para edição.' },
+        { status: 400 },
+      );
+    }
+
+    const parsed = parseTransactionInput(body);
+    if ('error' in parsed) {
+      return Response.json({ error: parsed.error }, { status: 400 });
+    }
+    const { description, type, amountCents, transactionDate, categoryId } =
+      parsed.input;
+
+    const db = getDb();
+    await seedCategories(db);
+    const category = await categoryMatchesType(db, categoryId, type);
+    if (!category) {
+      return Response.json(
+        { error: 'A categoria não corresponde ao tipo da transação.' },
+        { status: 400 },
+      );
+    }
+
+    const result = await db
+      .prepare(
+        `UPDATE transactions
+            SET description = ?, type = ?, amount_cents = ?,
+                transaction_date = ?, category_id = ?
+          WHERE id = ?`,
+      )
+      .bind(description, type, amountCents, transactionDate, categoryId, id)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return Response.json(
+        { error: 'Transação não encontrada.' },
+        { status: 404 },
+      );
+    }
+
+    return Response.json({ id, updated: true });
+  } catch (error) {
+    console.error('Failed to update transaction', error);
+    return Response.json(
+      { error: 'Não foi possível salvar as alterações da transação.' },
       { status: 500 },
     );
   }
