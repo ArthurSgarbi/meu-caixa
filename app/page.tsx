@@ -17,6 +17,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   LoaderCircle,
+  PiggyBank,
   Plus,
   ReceiptText,
   WalletCards,
@@ -38,6 +39,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { InvestmentsPanel } from './investments-panel';
 
 type TransactionType = 'income' | 'expense';
 
@@ -337,292 +340,323 @@ export default function Home() {
   const monthLabel = monthFormatter.format(new Date(`${month}-01T00:00:00Z`));
 
   return (
-    <main className="min-h-screen bg-background pb-16 text-foreground">
-      <header className="finance-grid border-b border-white/10 bg-[#091b32] text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-[#2de29b] text-[#08243b] shadow-[0_8px_24px_rgba(45,226,155,.25)]">
-              <CircleDollarSign className="size-5" aria-hidden="true" />
-            </span>
-            <div>
-              <p className="text-lg font-bold tracking-[-0.03em]">Meu Caixa</p>
-              <p className="text-xs text-slate-300">
-                Controle financeiro pessoal
-              </p>
-            </div>
-          </div>
-          <Badge className="border border-white/15 bg-white/10 text-white">
-            MVP · Fase 1
-          </Badge>
-        </div>
-
-        <div className="mx-auto max-w-7xl px-5 pb-12 pt-5 sm:px-8 lg:px-10">
-          <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <p className="mb-1 text-sm font-medium text-[#65e6b2]">
-                Visão mensal
-              </p>
-              <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
-                {monthLabel}
-              </h1>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                aria-label="Mês anterior"
-                size="icon"
-                onClick={() => changeMonth(-1)}
-                className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
-              >
-                <ChevronLeft />
-              </Button>
-              <Button
-                aria-label="Próximo mês"
-                size="icon"
-                onClick={() => changeMonth(1)}
-                className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
-              >
-                <ChevronRight />
-              </Button>
-            </div>
-          </div>
-
-          <section
-            className="grid gap-3 md:grid-cols-3"
-            aria-label="Resumo mensal"
-          >
-            <SummaryCard
-              label="Receitas"
-              value={formatCurrency(data.summary.incomeCents)}
-              icon={<ArrowUpRight />}
-              tone="positive"
-              loading={loading}
-            />
-            <SummaryCard
-              label="Despesas"
-              value={formatCurrency(data.summary.expenseCents)}
-              icon={<ArrowDownLeft />}
-              tone="negative"
-              loading={loading}
-            />
-            <SummaryCard
-              label="Saldo do mês"
-              value={formatCurrency(data.summary.balanceCents)}
-              icon={<WalletCards />}
-              tone="balance"
-              loading={loading}
-            />
-          </section>
-        </div>
-      </header>
-
-      <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-        <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(9,27,50,.09)] ring-1 ring-slate-200">
-          <CardHeader className="border-b border-slate-100 pb-4">
-            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                <Plus className="size-4" />
+    <main className="min-h-screen bg-background text-foreground">
+      <Tabs defaultValue="expenses" className="gap-0">
+        <nav className="border-b border-white/10 bg-[#091b32] text-white">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 place-items-center rounded-xl bg-[#2de29b] text-[#08243b] shadow-[0_8px_24px_rgba(45,226,155,.25)]">
+                <CircleDollarSign className="size-5" aria-hidden="true" />
               </span>
-              Nova transação
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              <div className="space-y-2">
-                <Label htmlFor="description">Descrição</Label>
-                <Input
-                  id="description"
-                  name="description"
-                  required
-                  minLength={2}
-                  maxLength={120}
-                  placeholder="Ex.: supermercado"
-                  className="h-11"
-                />
+              <div>
+                <p className="text-lg font-bold tracking-[-0.03em]">
+                  Meu Caixa
+                </p>
+                <p className="text-xs text-slate-300">
+                  Controle financeiro pessoal
+                </p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="type">Tipo</Label>
-                  <NativeSelect
-                    id="type"
-                    value={type}
-                    onChange={(event) => {
-                      setType(event.target.value as TransactionType);
-                      setCategoryId('');
-                    }}
-                    className="w-full"
-                  >
-                    <NativeSelectOption value="expense">
-                      Despesa
-                    </NativeSelectOption>
-                    <NativeSelectOption value="income">
-                      Receita
-                    </NativeSelectOption>
-                  </NativeSelect>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Valor</Label>
-                  <Input
-                    id="amount"
-                    name="amount"
-                    required
-                    inputMode="decimal"
-                    placeholder="R$ 0,00"
-                    className="h-11"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Categoria</Label>
-                  <NativeSelect
-                    id="category"
-                    required
-                    value={selectedCategoryId}
-                    onChange={(event) => setCategoryId(event.target.value)}
-                    className="w-full"
-                    disabled={!availableCategories.length}
-                  >
-                    {availableCategories.map((category) => (
-                      <NativeSelectOption
-                        key={category.id}
-                        value={String(category.id)}
-                      >
-                        {category.name}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transactionDate">Data</Label>
-                  <Input
-                    id="transactionDate"
-                    name="transactionDate"
-                    required
-                    type="date"
-                    defaultValue={localToday()}
-                    className="h-11"
-                  />
-                </div>
-              </div>
-
-              {(message || error) && (
-                <output
-                  aria-live="polite"
-                  className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
-                >
-                  {error && <AlertCircle className="mt-0.5 size-4 shrink-0" />}
-                  {error || message}
-                </output>
-              )}
-
-              <Button
-                type="submit"
-                size="lg"
-                disabled={saving || loading || !selectedCategoryId}
-                className="h-11 w-full font-semibold"
-              >
-                {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
-                {saving ? 'Registrando...' : 'Registrar transação'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(9,27,50,.07)] ring-1 ring-slate-200">
-          <CardHeader className="flex-row items-center justify-between border-b border-slate-100 pb-4">
-            <div>
-              <CardTitle className="text-lg font-bold tracking-tight">
-                Movimentações
-              </CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {loading
-                  ? 'Carregando o mês...'
-                  : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
-              </p>
             </div>
-            <CalendarDays
-              className="size-5 text-muted-foreground"
-              aria-hidden="true"
-            />
-          </CardHeader>
-          <CardContent className="px-0">
-            {loading ? (
-              <div className="grid min-h-60 place-items-center text-muted-foreground">
-                <LoaderCircle
-                  className="size-7 animate-spin"
-                  aria-label="Carregando transações"
-                />
-              </div>
-            ) : error && data.transactions.length === 0 ? (
-              <div className="grid min-h-60 place-items-center px-6 text-center">
+            <TabsList className="h-11 rounded-xl border border-white/10 bg-white/10 p-1">
+              <TabsTrigger
+                value="expenses"
+                className="h-9 px-4 text-slate-300 data-active:bg-white data-active:text-[#091b32]"
+              >
+                <ReceiptText /> Gastos
+              </TabsTrigger>
+              <TabsTrigger
+                value="investments"
+                className="h-9 px-4 text-slate-300 data-active:bg-violet-100 data-active:text-violet-950"
+              >
+                <PiggyBank /> Investimentos
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </nav>
+
+        <TabsContent value="expenses" className="pb-16">
+          <header className="finance-grid border-b border-white/10 bg-[#091b32] text-white">
+            <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
+              <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
-                  <p className="font-medium">
-                    Não foi possível abrir suas movimentações
+                  <p className="mb-1 text-sm font-medium text-[#65e6b2]">
+                    Visão mensal
                   </p>
+                  <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
+                    {monthLabel}
+                  </h1>
+                </div>
+                <div className="flex items-center gap-2">
                   <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => void loadData(month)}
+                    aria-label="Mês anterior"
+                    size="icon"
+                    onClick={() => changeMonth(-1)}
+                    className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
                   >
-                    Tentar novamente
+                    <ChevronLeft />
+                  </Button>
+                  <Button
+                    aria-label="Próximo mês"
+                    size="icon"
+                    onClick={() => changeMonth(1)}
+                    className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
+                  >
+                    <ChevronRight />
                   </Button>
                 </div>
               </div>
-            ) : data.transactions.length === 0 ? (
-              <div className="grid min-h-60 place-items-center px-6 text-center">
-                <div>
-                  <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
-                    <ReceiptText />
+
+              <section
+                className="grid gap-3 md:grid-cols-3"
+                aria-label="Resumo mensal"
+              >
+                <SummaryCard
+                  label="Receitas"
+                  value={formatCurrency(data.summary.incomeCents)}
+                  icon={<ArrowUpRight />}
+                  tone="positive"
+                  loading={loading}
+                />
+                <SummaryCard
+                  label="Despesas"
+                  value={formatCurrency(data.summary.expenseCents)}
+                  icon={<ArrowDownLeft />}
+                  tone="negative"
+                  loading={loading}
+                />
+                <SummaryCard
+                  label="Saldo do mês"
+                  value={formatCurrency(data.summary.balanceCents)}
+                  icon={<WalletCards />}
+                  tone="balance"
+                  loading={loading}
+                />
+              </section>
+            </div>
+          </header>
+
+          <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
+            <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(9,27,50,.09)] ring-1 ring-slate-200">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                  <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                    <Plus className="size-4" />
                   </span>
-                  <p className="font-semibold">
-                    Nenhuma movimentação neste mês
-                  </p>
+                  Nova transação
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form className="space-y-5" onSubmit={handleSubmit}>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Descrição</Label>
+                    <Input
+                      id="description"
+                      name="description"
+                      required
+                      minLength={2}
+                      maxLength={120}
+                      placeholder="Ex.: supermercado"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="type">Tipo</Label>
+                      <NativeSelect
+                        id="type"
+                        value={type}
+                        onChange={(event) => {
+                          setType(event.target.value as TransactionType);
+                          setCategoryId('');
+                        }}
+                        className="w-full"
+                      >
+                        <NativeSelectOption value="expense">
+                          Despesa
+                        </NativeSelectOption>
+                        <NativeSelectOption value="income">
+                          Receita
+                        </NativeSelectOption>
+                      </NativeSelect>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Valor</Label>
+                      <Input
+                        id="amount"
+                        name="amount"
+                        required
+                        inputMode="decimal"
+                        placeholder="R$ 0,00"
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoria</Label>
+                      <NativeSelect
+                        id="category"
+                        required
+                        value={selectedCategoryId}
+                        onChange={(event) => setCategoryId(event.target.value)}
+                        className="w-full"
+                        disabled={!availableCategories.length}
+                      >
+                        {availableCategories.map((category) => (
+                          <NativeSelectOption
+                            key={category.id}
+                            value={String(category.id)}
+                          >
+                            {category.name}
+                          </NativeSelectOption>
+                        ))}
+                      </NativeSelect>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="transactionDate">Data</Label>
+                      <Input
+                        id="transactionDate"
+                        name="transactionDate"
+                        required
+                        type="date"
+                        defaultValue={localToday()}
+                        className="h-11"
+                      />
+                    </div>
+                  </div>
+
+                  {(message || error) && (
+                    <output
+                      aria-live="polite"
+                      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
+                    >
+                      {error && (
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      )}
+                      {error || message}
+                    </output>
+                  )}
+
+                  <Button
+                    type="submit"
+                    size="lg"
+                    disabled={saving || loading || !selectedCategoryId}
+                    className="h-11 w-full font-semibold"
+                  >
+                    {saving ? (
+                      <LoaderCircle className="animate-spin" />
+                    ) : (
+                      <Plus />
+                    )}
+                    {saving ? 'Registrando...' : 'Registrar transação'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(9,27,50,.07)] ring-1 ring-slate-200">
+              <CardHeader className="flex-row items-center justify-between border-b border-slate-100 pb-4">
+                <div>
+                  <CardTitle className="text-lg font-bold tracking-tight">
+                    Movimentações
+                  </CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Use o formulário para registrar sua primeira transação.
+                    {loading
+                      ? 'Carregando o mês...'
+                      : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
                   </p>
                 </div>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="pl-5">Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead className="pr-5 text-right">Valor</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {data.transactions.map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell className="pl-5 text-muted-foreground">
-                        {dateFormatter.format(
-                          new Date(`${transaction.transactionDate}T00:00:00Z`),
-                        )}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {transaction.description}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">
-                          {transaction.categoryName}
-                        </Badge>
-                      </TableCell>
-                      <TableCell
-                        className={`pr-5 text-right font-semibold tabular-nums ${transaction.type === 'income' ? 'text-emerald-700' : 'text-slate-800'}`}
+                <CalendarDays
+                  className="size-5 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              </CardHeader>
+              <CardContent className="px-0">
+                {loading ? (
+                  <div className="grid min-h-60 place-items-center text-muted-foreground">
+                    <LoaderCircle
+                      className="size-7 animate-spin"
+                      aria-label="Carregando transações"
+                    />
+                  </div>
+                ) : error && data.transactions.length === 0 ? (
+                  <div className="grid min-h-60 place-items-center px-6 text-center">
+                    <div>
+                      <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
+                      <p className="font-medium">
+                        Não foi possível abrir suas movimentações
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => void loadData(month)}
                       >
-                        {transaction.type === 'expense' ? '− ' : '+ '}
-                        {formatCurrency(transaction.amountCents)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                        Tentar novamente
+                      </Button>
+                    </div>
+                  </div>
+                ) : data.transactions.length === 0 ? (
+                  <div className="grid min-h-60 place-items-center px-6 text-center">
+                    <div>
+                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+                        <ReceiptText />
+                      </span>
+                      <p className="font-semibold">
+                        Nenhuma movimentação neste mês
+                      </p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Use o formulário para registrar sua primeira transação.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="pl-5">Data</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead className="pr-5 text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {data.transactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="pl-5 text-muted-foreground">
+                            {dateFormatter.format(
+                              new Date(
+                                `${transaction.transactionDate}T00:00:00Z`,
+                              ),
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {transaction.description}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {transaction.categoryName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell
+                            className={`pr-5 text-right font-semibold tabular-nums ${transaction.type === 'income' ? 'text-emerald-700' : 'text-slate-800'}`}
+                          >
+                            {transaction.type === 'expense' ? '− ' : '+ '}
+                            {formatCurrency(transaction.amountCents)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="investments">
+          <InvestmentsPanel />
+        </TabsContent>
+      </Tabs>
     </main>
   );
 }

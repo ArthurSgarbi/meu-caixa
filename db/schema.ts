@@ -58,3 +58,26 @@ export const budgets = sqliteTable(
     uniqueIndex('idx_budgets_category_month').on(table.categoryId, table.month),
   ],
 );
+
+export const investments = sqliteTable(
+  'investments',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    assetClass: text('asset_class', {
+      enum: [
+        'Renda fixa',
+        'Ações',
+        'Fundos imobiliários',
+        'Criptoativos',
+        'Outros',
+      ],
+    }).notNull(),
+    investedCents: integer('invested_cents').notNull(),
+    currentValueCents: integer('current_value_cents').notNull(),
+    acquisitionDate: text('acquisition_date').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('idx_investments_asset_class').on(table.assetClass)],
+);
