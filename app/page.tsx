@@ -489,9 +489,9 @@ export default function Home() {
 
   if (sessionLoading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#091b32] text-white">
+      <main className="grid min-h-screen place-items-center bg-[#f97316] text-white">
         <div className="text-center">
-          <LoaderCircle className="mx-auto size-8 animate-spin text-[#2de29b]" />
+          <LoaderCircle className="mx-auto size-8 animate-spin text-white" />
           <p className="mt-3 text-sm text-slate-300">
             Protegendo seus dados...
           </p>
@@ -516,45 +516,45 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Tabs defaultValue="expenses" className="gap-0">
-        <nav className="border-b border-white/10 bg-[#091b32] text-white">
+        <nav className="border-b border-black/15 bg-[#f97316] text-white">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-[#2de29b] text-[#08243b] shadow-[0_8px_24px_rgba(45,226,155,.25)]">
+              <span className="grid size-10 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
                 <CircleDollarSign className="size-5" aria-hidden="true" />
               </span>
               <div>
                 <p className="text-lg font-bold tracking-[-0.03em]">
                   Meu Caixa
                 </p>
-                <p className="text-xs text-slate-300">
+                <p className="text-xs text-white/75">
                   Controle financeiro pessoal
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <TabsList className="h-11 rounded-xl border border-white/10 bg-white/10 p-1">
+              <TabsList className="h-11 rounded-xl border border-black/15 bg-black/20 p-1">
                 <TabsTrigger
                   value="expenses"
-                  className="h-9 px-4 text-slate-300 data-active:bg-white data-active:text-[#091b32]"
+                  className="h-9 px-4 text-white/75 data-active:bg-black data-active:text-white"
                 >
                   <ReceiptText /> Gastos
                 </TabsTrigger>
                 <TabsTrigger
                   value="investments"
-                  className="h-9 px-4 text-slate-300 data-active:bg-violet-100 data-active:text-violet-950"
+                  className="h-9 px-4 text-white/75 data-active:bg-black data-active:text-white"
                 >
                   <PiggyBank /> Investimentos
                 </TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-3 py-2">
-                <span className="grid size-7 place-items-center rounded-full bg-[#2de29b] text-xs font-bold text-[#08243b]">
+              <div className="flex items-center gap-2 rounded-xl border border-black/15 bg-black/20 px-3 py-2">
+                <span className="grid size-7 place-items-center rounded-full bg-white text-xs font-bold text-black">
                   {user.displayName.charAt(0).toUpperCase()}
                 </span>
                 <div className="hidden max-w-36 sm:block">
                   <p className="truncate text-xs font-semibold">
                     {user.displayName}
                   </p>
-                  <p className="truncate text-[11px] text-slate-400">
+                  <p className="truncate text-[11px] text-white/65">
                     Conta protegida
                   </p>
                 </div>
@@ -569,7 +569,7 @@ export default function Home() {
                   }
                   variant="ghost"
                   size="icon-sm"
-                  className="text-slate-300 hover:bg-white/10 hover:text-white"
+                  className="text-white/75 hover:bg-black/20 hover:text-white"
                 >
                   <LogOut />
                 </Button>
@@ -579,11 +579,11 @@ export default function Home() {
         </nav>
 
         <TabsContent value="expenses" className="pb-16">
-          <header className="finance-grid border-b border-white/10 bg-[#091b32] text-white">
+          <header className="finance-grid border-b border-black/15 bg-[#f97316] text-white">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="mb-1 text-sm font-medium text-[#65e6b2]">
+                  <p className="mb-1 text-sm font-medium text-white">
                     Visão mensal
                   </p>
                   <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
@@ -595,7 +595,7 @@ export default function Home() {
                     aria-label="Mês anterior"
                     size="icon"
                     onClick={() => changeMonth(-1)}
-                    className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
+                    className="border border-black/15 bg-black/20 text-white hover:bg-black/30"
                   >
                     <ChevronLeft />
                   </Button>
@@ -603,7 +603,7 @@ export default function Home() {
                     aria-label="Próximo mês"
                     size="icon"
                     onClick={() => changeMonth(1)}
-                    className="border border-white/15 bg-white/10 text-white hover:bg-white/20"
+                    className="border border-black/15 bg-black/20 text-white hover:bg-black/30"
                   >
                     <ChevronRight />
                   </Button>
@@ -640,8 +640,8 @@ export default function Home() {
           </header>
 
           <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-            <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(9,27,50,.09)] ring-1 ring-slate-200">
-              <CardHeader className="border-b border-slate-100 pb-4">
+            <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
+              <CardHeader className="border-b border-white/10 pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
                   <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
                     <Plus className="size-4" />
@@ -732,7 +732,7 @@ export default function Home() {
                   {(message || error) && (
                     <output
                       aria-live="polite"
-                      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}
+                      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-red-950/70 text-red-200' : 'bg-white/10 text-white'}`}
                     >
                       {error && (
                         <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -758,8 +758,8 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(9,27,50,.07)] ring-1 ring-slate-200">
-              <CardHeader className="flex-row items-center justify-between border-b border-slate-100 pb-4">
+            <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
+              <CardHeader className="flex-row items-center justify-between border-b border-white/10 pb-4">
                 <div>
                   <CardTitle className="text-lg font-bold tracking-tight">
                     Movimentações
@@ -802,7 +802,7 @@ export default function Home() {
                 ) : data.transactions.length === 0 ? (
                   <div className="grid min-h-60 place-items-center px-6 text-center">
                     <div>
-                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-white/10 text-white">
                         <ReceiptText />
                       </span>
                       <p className="font-semibold">
@@ -844,9 +844,7 @@ export default function Home() {
                               {transaction.categoryName}
                             </Badge>
                           </TableCell>
-                          <TableCell
-                            className={`text-right font-semibold tabular-nums ${transaction.type === 'income' ? 'text-emerald-700' : 'text-slate-800'}`}
-                          >
+                          <TableCell className="text-right font-semibold text-white tabular-nums">
                             {transaction.type === 'expense' ? '− ' : '+ '}
                             {formatCurrency(transaction.amountCents)}
                           </TableCell>
@@ -1028,52 +1026,52 @@ function AuthScreen({
   onRetry: () => void;
 }) {
   return (
-    <main className="finance-grid min-h-screen bg-[#091b32] text-white">
+    <main className="finance-grid min-h-screen bg-[#f97316] text-white">
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
         <section>
           <div className="mb-9 flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-xl bg-[#2de29b] text-[#08243b] shadow-[0_8px_24px_rgba(45,226,155,.25)]">
+            <span className="grid size-11 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
               <CircleDollarSign className="size-6" aria-hidden="true" />
             </span>
             <div>
               <p className="text-xl font-bold tracking-[-0.03em]">Meu Caixa</p>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-white/75">
                 Suas finanças, somente suas
               </p>
             </div>
           </div>
 
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[.16em] text-[#65e6b2]">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[.16em] text-white">
             Controle pessoal e seguro
           </p>
           <h1 className="max-w-xl text-4xl font-bold tracking-[-0.05em] sm:text-5xl">
             Cada pessoa acessa apenas o próprio caixa.
           </h1>
-          <p className="mt-5 max-w-lg text-base leading-7 text-slate-300">
+          <p className="mt-5 max-w-lg text-base leading-7 text-white/80">
             Entre para registrar gastos, receitas e investimentos em uma área
             individual, protegida pela sua conta.
           </p>
 
           <div className="mt-8 grid max-w-lg gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-white/[.06] p-4">
-              <ShieldCheck className="mb-3 size-5 text-[#65e6b2]" />
+            <div className="rounded-xl border border-black/15 bg-black/20 p-4">
+              <ShieldCheck className="mb-3 size-5 text-white" />
               <p className="font-semibold">Dados isolados</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400">
+              <p className="mt-1 text-sm leading-6 text-white/70">
                 Consultas e alterações são vinculadas à conta autenticada.
               </p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[.06] p-4">
-              <LockKeyhole className="mb-3 size-5 text-[#65e6b2]" />
+            <div className="rounded-xl border border-black/15 bg-black/20 p-4">
+              <LockKeyhole className="mb-3 size-5 text-white" />
               <p className="font-semibold">Senha fora do app</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400">
+              <p className="mt-1 text-sm leading-6 text-white/70">
                 A autenticação é feita com segurança pela conta ChatGPT.
               </p>
             </div>
           </div>
         </section>
 
-        <Card className="border-white/10 bg-white text-slate-950 shadow-[0_30px_80px_rgba(0,0,0,.25)]">
-          <CardHeader className="border-b border-slate-100 pb-5">
+        <Card className="border-white/15 bg-black text-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+          <CardHeader className="border-b border-white/10 pb-5">
             <CardTitle className="text-2xl font-bold tracking-[-0.04em]">
               Acesse seu espaço
             </CardTitle>
@@ -1150,9 +1148,9 @@ function SummaryCard({
   loading: boolean;
 }) {
   const styles = {
-    positive: 'border-[#2de29b]/25 bg-[#2de29b]/10 text-[#65e6b2]',
-    negative: 'border-amber-300/20 bg-amber-300/10 text-amber-200',
-    balance: 'border-white/15 bg-white/10 text-white',
+    positive: 'border-white/25 bg-white/10 text-white',
+    negative: 'border-black/15 bg-black/15 text-white',
+    balance: 'border-black/15 bg-black/20 text-white',
   };
   return (
     <div className={`rounded-2xl border p-5 backdrop-blur-sm ${styles[tone]}`}>

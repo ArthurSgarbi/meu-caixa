@@ -85,7 +85,7 @@ const assetClasses = [
 ];
 
 const assetColors: Record<string, string> = {
-  'Renda fixa': '#31d2a0',
+  'Renda fixa': '#ffffff',
   Ações: '#7367f0',
   'Fundos imobiliários': '#f6a94a',
   Criptoativos: '#ee6b82',
@@ -296,19 +296,19 @@ export function InvestmentsPanel() {
   const profitIsPositive = data.summary.profitCents >= 0;
 
   return (
-    <section className="min-h-[calc(100vh-81px)] bg-[#f6f7fb] pb-16">
-      <header className="investment-grid bg-[#171640] text-white">
+    <section className="min-h-[calc(100vh-81px)] bg-[#f97316] pb-16">
+      <header className="investment-grid bg-[#f97316] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="mb-1 text-sm font-medium text-[#aca5ff]">
+              <p className="mb-1 text-sm font-medium text-white">
                 Carteira de investimentos
               </p>
               <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
                 Seu patrimônio em um só lugar
               </h1>
             </div>
-            <Badge className="border border-violet-300/20 bg-violet-300/10 text-violet-100">
+            <Badge className="border border-black/15 bg-black/20 text-white">
               Atualização manual
             </Badge>
           </div>
@@ -342,10 +342,10 @@ export function InvestmentsPanel() {
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-        <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(23,22,64,.09)] ring-1 ring-violet-100">
-          <CardHeader className="border-b border-violet-50 pb-4">
+        <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
+          <CardHeader className="border-b border-white/10 pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <span className="grid size-8 place-items-center rounded-lg bg-violet-100 text-violet-700">
+              <span className="grid size-8 place-items-center rounded-lg bg-white text-black">
                 <Plus className="size-4" />
               </span>
               Novo investimento
@@ -423,8 +423,8 @@ export function InvestmentsPanel() {
                   aria-live="polite"
                   className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${
                     error
-                      ? 'bg-red-50 text-red-700'
-                      : 'bg-emerald-50 text-emerald-700'
+                      ? 'bg-red-950/70 text-red-200'
+                      : 'bg-white/10 text-white'
                   }`}
                 >
                   {error && <AlertCircle className="mt-0.5 size-4 shrink-0" />}
@@ -436,7 +436,7 @@ export function InvestmentsPanel() {
                 type="submit"
                 size="lg"
                 disabled={saving || loading}
-                className="h-11 w-full bg-violet-700 font-semibold text-white hover:bg-violet-600"
+                className="h-11 w-full bg-[#f97316] font-semibold text-white hover:bg-[#ea580c]"
               >
                 {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
                 {saving ? 'Adicionando...' : 'Adicionar investimento'}
@@ -446,10 +446,10 @@ export function InvestmentsPanel() {
         </Card>
 
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(300px,.8fr)]">
-          <Card className="border-0 shadow-[0_18px_50px_rgba(23,22,64,.07)] ring-1 ring-violet-100">
-            <CardHeader className="border-b border-violet-50 pb-4">
+          <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
+            <CardHeader className="border-b border-white/10 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-                <BarChart3 className="size-5 text-violet-600" />
+                <BarChart3 className="size-5 text-white" />
                 Distribuição da carteira
               </CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -464,7 +464,7 @@ export function InvestmentsPanel() {
               ) : chartData.length === 0 ? (
                 <div className="grid h-72 place-items-center px-6 text-center">
                   <div>
-                    <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-violet-50 text-violet-500">
+                    <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-white/10 text-white">
                       <BarChart3 />
                     </span>
                     <p className="font-semibold">
@@ -486,6 +486,13 @@ export function InvestmentsPanel() {
                         formatter={(value) =>
                           currencyFormatter.format(Number(value))
                         }
+                        contentStyle={{
+                          backgroundColor: '#000000',
+                          border: '1px solid rgba(255,255,255,.18)',
+                          borderRadius: '10px',
+                          color: '#ffffff',
+                        }}
+                        itemStyle={{ color: '#ffffff' }}
                       />
                       <Pie
                         data={chartData}
@@ -509,7 +516,7 @@ export function InvestmentsPanel() {
                       return (
                         <div
                           key={item.assetClass}
-                          className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-lg bg-white/10 px-3 py-2"
                         >
                           <span className="flex min-w-0 items-center gap-2">
                             <span
@@ -536,10 +543,10 @@ export function InvestmentsPanel() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-[0_18px_50px_rgba(23,22,64,.07)] ring-1 ring-violet-100">
-            <CardHeader className="border-b border-violet-50 pb-4">
+          <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
+            <CardHeader className="border-b border-white/10 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-                <TrendingUp className="size-5 text-violet-600" />
+                <TrendingUp className="size-5 text-white" />
                 Seus ativos
               </CardTitle>
               <p className="text-sm text-muted-foreground">
@@ -557,7 +564,7 @@ export function InvestmentsPanel() {
               ) : data.investments.length === 0 ? (
                 <div className="grid h-64 place-items-center px-4 text-center">
                   <div>
-                    <BriefcaseBusiness className="mx-auto mb-3 size-9 text-violet-400" />
+                    <BriefcaseBusiness className="mx-auto mb-3 size-9 text-white/70" />
                     <p className="font-semibold">Carteira vazia</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Cadastre seu primeiro ativo ao lado.
@@ -571,7 +578,7 @@ export function InvestmentsPanel() {
                   return (
                     <article
                       key={investment.id}
-                      className="rounded-xl border border-slate-100 bg-white p-4"
+                      className="rounded-xl border border-white/10 bg-black p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -591,8 +598,8 @@ export function InvestmentsPanel() {
                           <Badge
                             className={
                               result >= 0
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-red-50 text-red-700'
+                                ? 'bg-white/10 text-white'
+                                : 'bg-red-950/70 text-red-200'
                             }
                           >
                             {result >= 0 ? '+' : '−'}{' '}
@@ -743,7 +750,7 @@ export function InvestmentsPanel() {
                 <Button
                   type="submit"
                   disabled={editSaving}
-                  className="bg-violet-700 text-white hover:bg-violet-600"
+                  className="bg-[#f97316] text-white hover:bg-[#ea580c]"
                 >
                   {editSaving && <LoaderCircle className="animate-spin" />}
                   {editSaving ? 'Salvando...' : 'Salvar alterações'}
@@ -777,15 +784,13 @@ function InvestmentSummary({
   return (
     <div
       className={`rounded-2xl border p-5 backdrop-blur-sm ${
-        featured
-          ? 'border-violet-300/35 bg-violet-300/15'
-          : 'border-white/10 bg-white/[.07]'
+        featured ? 'border-white/30 bg-white/10' : 'border-black/15 bg-black/20'
       }`}
     >
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-medium text-violet-100/80">{label}</p>
+        <p className="text-sm font-medium text-white/80">{label}</p>
         <span
-          className={`[&_svg]:size-5 ${positive ? 'text-[#7ee9c5]' : 'text-red-300'}`}
+          className={`[&_svg]:size-5 ${positive ? 'text-white' : 'text-red-200'}`}
         >
           {icon}
         </span>
@@ -799,7 +804,7 @@ function InvestmentSummary({
         {detail && !loading && (
           <span
             className={`text-sm font-semibold tabular-nums ${
-              positive ? 'text-[#7ee9c5]' : 'text-red-300'
+              positive ? 'text-white' : 'text-red-200'
             }`}
           >
             {detail}
