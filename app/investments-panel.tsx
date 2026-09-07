@@ -296,8 +296,8 @@ export function InvestmentsPanel() {
   const profitIsPositive = data.summary.profitCents >= 0;
 
   return (
-    <section className="brand-sunset min-h-[calc(100vh-81px)] pb-16">
-      <header className="investment-grid text-white">
+    <section className="min-h-[calc(100vh-81px)] pb-16">
+      <header className="text-white">
         <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>

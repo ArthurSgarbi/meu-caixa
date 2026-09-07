@@ -87,13 +87,6 @@ body {
   --sidebar-ring: oklch(0.985 0 0);
 }
 
-.finance-grid {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 32px 32px;
-}
-
 .brand-sunset {
   background-color: #f4513e;
   background-image:
@@ -104,17 +97,9 @@ body {
     ),
     radial-gradient(circle at 96% 4%, rgba(236, 12, 38, 0.94), transparent 44%),
     linear-gradient(125deg, #ff7a4f 0%, #f4513e 48%, #ef1e32 100%);
-}
-
-.investment-grid {
-  background-image:
-    radial-gradient(circle at 80% 20%, rgba(51, 55, 64, 0.3), transparent 30%),
-    linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size:
-    auto,
-    32px 32px,
-    32px 32px;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .dark {
