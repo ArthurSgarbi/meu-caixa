@@ -250,6 +250,12 @@ export default function Home() {
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [investmentTransferOpen, setInvestmentTransferOpen] = useState(false);
+  const [investmentTransferSaving, setInvestmentTransferSaving] =
+    useState(false);
+  const [investmentTransferError, setInvestmentTransferError] = useState('');
+  const [investmentAvailableBalanceCents, setInvestmentAvailableBalanceCents] =
+    useState<number | null>(null);
 
   const loadSession = useCallback(async (signal?: AbortSignal) => {
     setSessionError('');
@@ -445,6 +451,75 @@ export default function Home() {
     }
   }
 
+  async function handleInvestmentTransfer(
+    event: SyntheticEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const amountCents = parseCurrencyToCents(
+      formString(form.get('investmentAmount')),
+    );
+    const contributionDate = formString(form.get('investmentDate'));
+    const description = formString(form.get('investmentDescription')).trim();
+
+    setInvestmentTransferSaving(true);
+    setInvestmentTransferError('');
+    try {
+      const response = await fetch('/api/investment-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amountCents, contributionDate, description }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Não foi possível realizar o aporte.');
+      }
+
+      setInvestmentTransferOpen(false);
+      setMessage(
+        'Aporte realizado: o valor saiu da conta e entrou nos investimentos.',
+      );
+      setError('');
+      const transferMonth = contributionDate.slice(0, 7);
+      if (transferMonth !== month) setMonth(transferMonth);
+      else await loadData(month);
+      window.dispatchEvent(new Event('investment-wallet-updated'));
+    } catch (requestError) {
+      setInvestmentTransferError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível realizar o aporte.',
+      );
+    } finally {
+      setInvestmentTransferSaving(false);
+    }
+  }
+
+  async function openInvestmentTransfer() {
+    setInvestmentTransferError('');
+    setInvestmentAvailableBalanceCents(null);
+    setInvestmentTransferOpen(true);
+    try {
+      const response = await fetch('/api/investment-wallet');
+      const result = (await response.json()) as {
+        mainBalanceCents?: number;
+        error?: string;
+      };
+      if (!response.ok || !Number.isFinite(result.mainBalanceCents)) {
+        throw new Error(
+          result.error ?? 'Não foi possível consultar o saldo disponível.',
+        );
+      }
+      setInvestmentAvailableBalanceCents(Number(result.mainBalanceCents));
+    } catch (requestError) {
+      setInvestmentTransferError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível consultar o saldo disponível.',
+      );
+    }
+  }
+
   function openTransactionEditor(transaction: Transaction) {
     setEditingTransaction(transaction);
     setEditType(transaction.type);
@@ -599,6 +674,15 @@ export default function Home() {
                   </h1>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void openInvestmentTransfer()}
+                    className="mr-1 bg-white font-semibold text-black hover:bg-white/85"
+                  >
+                    <PiggyBank />
+                    <span className="hidden sm:inline">Novo investimento</span>
+                    <span className="sm:hidden">Investir</span>
+                  </Button>
                   <Button
                     aria-label="Mês anterior"
                     size="icon"
@@ -875,6 +959,106 @@ export default function Home() {
               </CardContent>
             </Card>
           </div>
+
+          <Dialog
+            open={investmentTransferOpen}
+            onOpenChange={(open) => {
+              if (!investmentTransferSaving) setInvestmentTransferOpen(open);
+            }}
+          >
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Novo investimento</DialogTitle>
+                <DialogDescription>
+                  O valor será descontado do saldo da conta e creditado no saldo
+                  de investimentos.
+                </DialogDescription>
+              </DialogHeader>
+              <form className="space-y-4" onSubmit={handleInvestmentTransfer}>
+                <div className="space-y-2">
+                  <Label htmlFor="investment-transfer-description">
+                    Descrição
+                  </Label>
+                  <Input
+                    id="investment-transfer-description"
+                    name="investmentDescription"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    defaultValue="Aplicação CDI/CDB"
+                    className="h-11"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="investment-transfer-amount">Valor</Label>
+                    <Input
+                      id="investment-transfer-amount"
+                      name="investmentAmount"
+                      required
+                      inputMode="decimal"
+                      placeholder="R$ 0,00"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="investment-transfer-date">Data</Label>
+                    <Input
+                      id="investment-transfer-date"
+                      name="investmentDate"
+                      type="date"
+                      required
+                      defaultValue={localToday()}
+                      className="h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
+                  Saldo principal disponível:{' '}
+                  {investmentAvailableBalanceCents === null
+                    ? 'consultando...'
+                    : formatCurrency(investmentAvailableBalanceCents)}
+                </div>
+
+                {investmentTransferError && (
+                  <output
+                    aria-live="polite"
+                    className="flex items-start gap-2 rounded-lg bg-red-950/70 px-3 py-2.5 text-sm text-red-200"
+                  >
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                    {investmentTransferError}
+                  </output>
+                )}
+
+                <DialogFooter className="mx-0 mb-0 -mr-4 -ml-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={investmentTransferSaving}
+                    onClick={() => setInvestmentTransferOpen(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      investmentTransferSaving ||
+                      investmentAvailableBalanceCents === null
+                    }
+                    className="bg-[#f4513e] text-white hover:bg-[#e83232]"
+                  >
+                    {investmentTransferSaving && (
+                      <LoaderCircle className="animate-spin" />
+                    )}
+                    {investmentTransferSaving
+                      ? 'Transferindo...'
+                      : 'Confirmar aporte'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           <Dialog
             open={editingTransaction !== null}

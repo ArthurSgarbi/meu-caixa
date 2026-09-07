@@ -99,6 +99,42 @@ export const investments = sqliteTable(
   ],
 );
 
+export const investmentWallets = sqliteTable(
+  'investment_wallets',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    ownerId: text('owner_id').notNull(),
+    balanceCents: integer('balance_cents').notNull().default(0),
+    annualCdiRateBps: integer('annual_cdi_rate_bps').notNull().default(1050),
+    cdbPercentageBps: integer('cdb_percentage_bps').notNull().default(10000),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('idx_investment_wallets_owner').on(table.ownerId)],
+);
+
+export const investmentContributions = sqliteTable(
+  'investment_contributions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    walletId: integer('wallet_id')
+      .notNull()
+      .references(() => investmentWallets.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id').notNull(),
+    description: text('description').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    contributionDate: text('contribution_date').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_investment_contributions_owner_date').on(
+      table.ownerId,
+      table.contributionDate,
+    ),
+    index('idx_investment_contributions_wallet').on(table.walletId),
+  ],
+);
+
 export const creditCards = sqliteTable(
   'credit_cards',
   {

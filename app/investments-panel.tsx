@@ -14,10 +14,14 @@ import {
   ArrowUpRight,
   BarChart3,
   BriefcaseBusiness,
+  Calculator,
   CircleDollarSign,
+  History,
+  Landmark,
   LoaderCircle,
   Pencil,
   Plus,
+  Save,
   TrendingUp,
 } from 'lucide-react';
 import { Pie, PieChart, Tooltip } from 'recharts';
@@ -39,6 +43,7 @@ import {
   NativeSelect,
   NativeSelectOption,
 } from '@/components/ui/native-select';
+import { calculateDailyYield } from '@/lib/investment-calculations';
 
 type Investment = {
   id: number;
@@ -65,6 +70,26 @@ type InvestmentData = {
   };
 };
 
+type Contribution = {
+  id: number;
+  description: string;
+  amountCents: number;
+  contributionDate: string;
+};
+
+type InvestmentWalletData = {
+  wallet: {
+    balanceCents: number;
+    annualCdiRate: number;
+    cdbPercentage: number;
+    effectiveAnnualRatePercent: number;
+    dailyRate: number;
+    dailyYieldCents: number;
+  };
+  mainBalanceCents: number;
+  contributions: Contribution[];
+};
+
 const emptyData: InvestmentData = {
   investments: [],
   allocation: [],
@@ -74,6 +99,19 @@ const emptyData: InvestmentData = {
     profitCents: 0,
     returnPercentage: 0,
   },
+};
+
+const emptyWalletData: InvestmentWalletData = {
+  wallet: {
+    balanceCents: 0,
+    annualCdiRate: 10.5,
+    cdbPercentage: 100,
+    effectiveAnnualRatePercent: 10.5,
+    dailyRate: 0,
+    dailyYieldCents: 0,
+  },
+  mainBalanceCents: 0,
+  contributions: [],
 };
 
 const assetClasses = [
@@ -131,6 +169,11 @@ function formString(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value : '';
 }
 
+function parsePercentage(value: string) {
+  const parsed = Number(value.trim().replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function localToday() {
   const today = new Date();
   const year = today.getFullYear();
@@ -150,6 +193,14 @@ export function InvestmentsPanel() {
   );
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [walletData, setWalletData] =
+    useState<InvestmentWalletData>(emptyWalletData);
+  const [walletLoading, setWalletLoading] = useState(true);
+  const [walletSaving, setWalletSaving] = useState(false);
+  const [walletMessage, setWalletMessage] = useState('');
+  const [walletError, setWalletError] = useState('');
+  const [annualCdiRate, setAnnualCdiRate] = useState('10,50');
+  const [cdbPercentage, setCdbPercentage] = useState('100');
 
   const loadInvestments = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -182,6 +233,46 @@ export function InvestmentsPanel() {
     }
   }, []);
 
+  const loadWallet = useCallback(async (signal?: AbortSignal) => {
+    setWalletLoading(true);
+    setWalletError('');
+    try {
+      const response = await fetch('/api/investment-wallet', { signal });
+      const result = (await response.json()) as InvestmentWalletData & {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          result.error ?? 'Não foi possível carregar seu saldo investido.',
+        );
+      }
+      setWalletData(result);
+      setAnnualCdiRate(
+        result.wallet.annualCdiRate.toFixed(2).replace('.', ','),
+      );
+      setCdbPercentage(
+        result.wallet.cdbPercentage
+          .toFixed(2)
+          .replace(/\.00$/, '')
+          .replace('.', ','),
+      );
+    } catch (requestError) {
+      if (
+        requestError instanceof DOMException &&
+        requestError.name === 'AbortError'
+      ) {
+        return;
+      }
+      setWalletError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível carregar seu saldo investido.',
+      );
+    } finally {
+      if (!signal?.aborted) setWalletLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -189,6 +280,19 @@ export function InvestmentsPanel() {
     });
     return () => controller.abort();
   }, [loadInvestments]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const refreshWallet = () => void loadWallet();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void loadWallet(controller.signal);
+    });
+    window.addEventListener('investment-wallet-updated', refreshWallet);
+    return () => {
+      controller.abort();
+      window.removeEventListener('investment-wallet-updated', refreshWallet);
+    };
+  }, [loadWallet]);
 
   const chartData = useMemo(
     () =>
@@ -199,6 +303,47 @@ export function InvestmentsPanel() {
       })),
     [data.allocation],
   );
+
+  const liveDailyYield = useMemo(
+    () =>
+      calculateDailyYield(
+        walletData.wallet.balanceCents,
+        parsePercentage(annualCdiRate),
+        parsePercentage(cdbPercentage),
+      ),
+    [annualCdiRate, cdbPercentage, walletData.wallet.balanceCents],
+  );
+
+  async function handleRateSubmit(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWalletSaving(true);
+    setWalletError('');
+    setWalletMessage('');
+    try {
+      const response = await fetch('/api/investment-wallet', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          annualCdiRate: parsePercentage(annualCdiRate),
+          cdbPercentage: parsePercentage(cdbPercentage),
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Não foi possível salvar as taxas.');
+      }
+      setWalletMessage('Taxas salvas. O rendimento diário foi recalculado.');
+      await loadWallet();
+    } catch (requestError) {
+      setWalletError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível salvar as taxas.',
+      );
+    } finally {
+      setWalletSaving(false);
+    }
+  }
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -309,37 +454,221 @@ export function InvestmentsPanel() {
               </h1>
             </div>
             <Badge className="border border-white/15 bg-[#292d35]/80 text-white">
-              Atualização manual
+              CDI/CDB · 252 dias úteis
             </Badge>
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
             <InvestmentSummary
-              label="Total aplicado"
-              value={formatCurrency(data.summary.investedCents)}
-              icon={<CircleDollarSign />}
-              loading={loading}
+              label="Saldo da conta"
+              value={formatCurrency(walletData.mainBalanceCents)}
+              detail="Disponível para investir"
+              icon={<Landmark />}
+              loading={walletLoading}
             />
             <InvestmentSummary
-              label="Patrimônio atual"
-              value={formatCurrency(data.summary.currentValueCents)}
+              label="Saldo investido"
+              value={formatCurrency(walletData.wallet.balanceCents)}
               icon={<BriefcaseBusiness />}
-              loading={loading}
+              loading={walletLoading}
               featured
             />
             <InvestmentSummary
-              label="Resultado acumulado"
-              value={`${profitIsPositive ? '+' : '−'} ${formatCurrency(
-                Math.abs(data.summary.profitCents),
-              )}`}
-              detail={`${profitIsPositive ? '+' : ''}${data.summary.returnPercentage.toFixed(2).replace('.', ',')}%`}
-              icon={profitIsPositive ? <ArrowUpRight /> : <ArrowDownRight />}
-              loading={loading}
-              positive={profitIsPositive}
+              label="Rendimento do dia"
+              value={`+ ${formatCurrency(liveDailyYield.dailyYieldCents)}`}
+              detail={`${(liveDailyYield.dailyRate * 100).toFixed(4).replace('.', ',')}% ao dia`}
+              icon={<TrendingUp />}
+              loading={walletLoading}
             />
           </div>
         </div>
       </header>
+
+      <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,.95fr)] lg:px-10">
+        <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
+          <CardHeader className="border-b border-white/10 pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+              <Calculator className="size-5 text-white" />
+              Calculador de rendimento diário
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Simulação bruta com capitalização composta e 252 dias úteis.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <form className="space-y-5" onSubmit={handleRateSubmit}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="annual-cdi-rate">Taxa anual do CDI (%)</Label>
+                  <Input
+                    id="annual-cdi-rate"
+                    inputMode="decimal"
+                    required
+                    value={annualCdiRate}
+                    onChange={(event) => setAnnualCdiRate(event.target.value)}
+                    className="h-11"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cdb-percentage">CDB (% do CDI)</Label>
+                  <Input
+                    id="cdb-percentage"
+                    inputMode="decimal"
+                    required
+                    value={cdbPercentage}
+                    onChange={(event) => setCdbPercentage(event.target.value)}
+                    className="h-11"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-xl border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Taxa efetiva anual
+                  </p>
+                  <p className="mt-1 font-bold tabular-nums">
+                    {liveDailyYield.effectiveAnnualRatePercent
+                      .toFixed(2)
+                      .replace('.', ',')}
+                    %
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Taxa diária</p>
+                  <p className="mt-1 font-bold tabular-nums">
+                    {(liveDailyYield.dailyRate * 100)
+                      .toFixed(6)
+                      .replace('.', ',')}
+                    %
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Rende hoje</p>
+                  <p className="mt-1 font-bold text-white tabular-nums">
+                    {formatCurrency(liveDailyYield.dailyYieldCents)}
+                  </p>
+                </div>
+              </div>
+
+              {(walletMessage || walletError) && (
+                <output
+                  aria-live="polite"
+                  className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${
+                    walletError
+                      ? 'bg-red-950/70 text-red-200'
+                      : 'bg-white/10 text-white'
+                  }`}
+                >
+                  {walletError && (
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  )}
+                  {walletError || walletMessage}
+                </output>
+              )}
+
+              <Button
+                type="submit"
+                disabled={walletSaving || walletLoading}
+                className="bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
+              >
+                {walletSaving ? (
+                  <LoaderCircle className="animate-spin" />
+                ) : (
+                  <Save />
+                )}
+                {walletSaving ? 'Salvando...' : 'Salvar taxas'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
+          <CardHeader className="border-b border-white/10 pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+              <History className="size-5 text-white" />
+              Histórico de aportes
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Últimas transferências da conta para os investimentos.
+            </p>
+          </CardHeader>
+          <CardContent className="max-h-[350px] space-y-3 overflow-y-auto">
+            {walletLoading ? (
+              <div className="grid h-40 place-items-center text-muted-foreground">
+                <LoaderCircle className="size-7 animate-spin" />
+              </div>
+            ) : walletData.contributions.length === 0 ? (
+              <div className="grid h-40 place-items-center px-4 text-center">
+                <div>
+                  <History className="mx-auto mb-3 size-8 text-white/70" />
+                  <p className="font-semibold">Nenhum aporte registrado</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Use “Novo investimento” na área de Gastos.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              walletData.contributions.map((contribution) => (
+                <article
+                  key={contribution.id}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">
+                      {contribution.description}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dateFormatter.format(
+                        new Date(`${contribution.contributionDate}T00:00:00Z`),
+                      )}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-bold text-white tabular-nums">
+                    + {formatCurrency(contribution.amountCents)}
+                  </p>
+                </article>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 lg:px-10">
+        <div className="mb-4">
+          <p className="text-sm font-medium text-white/75">
+            Carteira de ativos
+          </p>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Acompanhe a composição do patrimônio
+          </h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <InvestmentSummary
+            label="Total aplicado"
+            value={formatCurrency(data.summary.investedCents)}
+            icon={<CircleDollarSign />}
+            loading={loading}
+          />
+          <InvestmentSummary
+            label="Patrimônio atual"
+            value={formatCurrency(data.summary.currentValueCents)}
+            icon={<BriefcaseBusiness />}
+            loading={loading}
+            featured
+          />
+          <InvestmentSummary
+            label="Resultado acumulado"
+            value={`${profitIsPositive ? '+' : '−'} ${formatCurrency(
+              Math.abs(data.summary.profitCents),
+            )}`}
+            detail={`${profitIsPositive ? '+' : ''}${data.summary.returnPercentage.toFixed(2).replace('.', ',')}%`}
+            icon={profitIsPositive ? <ArrowUpRight /> : <ArrowDownRight />}
+            loading={loading}
+            positive={profitIsPositive}
+          />
+        </div>
+      </div>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
         <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
