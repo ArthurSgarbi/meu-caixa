@@ -135,6 +135,32 @@ export const investmentContributions = sqliteTable(
   ],
 );
 
+export const savedSimulations = sqliteTable(
+  'saved_simulations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    ownerId: text('owner_id').notNull(),
+    name: text('name').notNull(),
+    simulationType: text('simulation_type', {
+      enum: ['debt', 'investment'],
+    }).notNull(),
+    inputJson: text('input_json').notNull(),
+    resultJson: text('result_json').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_saved_simulations_owner_name').on(
+      table.ownerId,
+      table.name,
+    ),
+    index('idx_saved_simulations_owner_updated').on(
+      table.ownerId,
+      table.updatedAt,
+    ),
+  ],
+);
+
 export const creditCards = sqliteTable(
   'credit_cards',
   {

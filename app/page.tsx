@@ -13,6 +13,7 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   CalendarDays,
+  ChartNoAxesCombined,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
@@ -57,6 +58,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { CreditCardsPanel } from './credit-cards-panel';
 import { InvestmentsPanel } from './investments-panel';
+import { SimulationsPanel } from './simulations-panel';
 
 type TransactionType = 'income' | 'expense';
 
@@ -627,6 +629,12 @@ export default function Home() {
                   className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
                 >
                   <CreditCard /> Cartões
+                </TabsTrigger>
+                <TabsTrigger
+                  value="simulations"
+                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                >
+                  <ChartNoAxesCombined /> Simulações
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
@@ -1206,6 +1214,10 @@ export default function Home() {
 
         <TabsContent value="credit-cards">
           <CreditCardsPanel />
+        </TabsContent>
+
+        <TabsContent value="simulations">
+          <SimulationsPanel />
         </TabsContent>
       </Tabs>
     </main>
