@@ -12,6 +12,7 @@ import {
   AlertCircle,
   ArrowDownLeft,
   ArrowUpRight,
+  Bot,
   CalendarDays,
   ChartNoAxesCombined,
   ChevronLeft,
@@ -56,6 +57,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AssistantPanel } from './assistant-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
 import { InvestmentsPanel } from './investments-panel';
 import { SimulationsPanel } from './simulations-panel';
@@ -635,6 +637,12 @@ export default function Home() {
                   className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
                 >
                   <ChartNoAxesCombined /> Simulações
+                </TabsTrigger>
+                <TabsTrigger
+                  value="assistant"
+                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                >
+                  <Bot /> Assistente IA
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
@@ -1218,6 +1226,10 @@ export default function Home() {
 
         <TabsContent value="simulations">
           <SimulationsPanel />
+        </TabsContent>
+
+        <TabsContent value="assistant">
+          <AssistantPanel />
         </TabsContent>
       </Tabs>
     </main>
