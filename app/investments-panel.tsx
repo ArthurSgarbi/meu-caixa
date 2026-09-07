@@ -296,8 +296,8 @@ export function InvestmentsPanel() {
   const profitIsPositive = data.summary.profitCents >= 0;
 
   return (
-    <section className="min-h-[calc(100vh-81px)] bg-[#f97316] pb-16">
-      <header className="investment-grid bg-[#f97316] text-white">
+    <section className="min-h-[calc(100vh-81px)] bg-[#c2410c] pb-16">
+      <header className="investment-grid bg-[#c2410c] text-white">
         <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -308,7 +308,7 @@ export function InvestmentsPanel() {
                 Seu patrimônio em um só lugar
               </h1>
             </div>
-            <Badge className="border border-black/15 bg-black/20 text-white">
+            <Badge className="border border-white/15 bg-[#292d35]/80 text-white">
               Atualização manual
             </Badge>
           </div>
@@ -436,7 +436,7 @@ export function InvestmentsPanel() {
                 type="submit"
                 size="lg"
                 disabled={saving || loading}
-                className="h-11 w-full bg-[#f97316] font-semibold text-white hover:bg-[#ea580c]"
+                className="h-11 w-full bg-[#c2410c] font-semibold text-white hover:bg-[#9a3412]"
               >
                 {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
                 {saving ? 'Adicionando...' : 'Adicionar investimento'}
@@ -487,7 +487,7 @@ export function InvestmentsPanel() {
                           currencyFormatter.format(Number(value))
                         }
                         contentStyle={{
-                          backgroundColor: '#000000',
+                          backgroundColor: '#242830',
                           border: '1px solid rgba(255,255,255,.18)',
                           borderRadius: '10px',
                           color: '#ffffff',
@@ -578,7 +578,7 @@ export function InvestmentsPanel() {
                   return (
                     <article
                       key={investment.id}
-                      className="rounded-xl border border-white/10 bg-black p-4"
+                      className="rounded-xl border border-white/10 bg-[#242830] p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -750,7 +750,7 @@ export function InvestmentsPanel() {
                 <Button
                   type="submit"
                   disabled={editSaving}
-                  className="bg-[#f97316] text-white hover:bg-[#ea580c]"
+                  className="bg-[#c2410c] text-white hover:bg-[#9a3412]"
                 >
                   {editSaving && <LoaderCircle className="animate-spin" />}
                   {editSaving ? 'Salvando...' : 'Salvar alterações'}
@@ -784,7 +784,9 @@ function InvestmentSummary({
   return (
     <div
       className={`rounded-2xl border p-5 backdrop-blur-sm ${
-        featured ? 'border-white/30 bg-white/10' : 'border-black/15 bg-black/20'
+        featured
+          ? 'border-white/30 bg-white/10'
+          : 'border-white/15 bg-[#292d35]/80'
       }`}
     >
       <div className="mb-4 flex items-center justify-between">

@@ -489,7 +489,7 @@ export default function Home() {
 
   if (sessionLoading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f97316] text-white">
+      <main className="grid min-h-screen place-items-center bg-[#c2410c] text-white">
         <div className="text-center">
           <LoaderCircle className="mx-auto size-8 animate-spin text-white" />
           <p className="mt-3 text-sm text-slate-300">
@@ -516,7 +516,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Tabs defaultValue="expenses" className="gap-0">
-        <nav className="border-b border-black/15 bg-[#f97316] text-white">
+        <nav className="border-b border-white/15 bg-[#c2410c] text-white">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
@@ -532,21 +532,21 @@ export default function Home() {
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <TabsList className="h-11 rounded-xl border border-black/15 bg-black/20 p-1">
+              <TabsList className="h-11 rounded-xl border border-white/15 bg-[#292d35]/80 p-1">
                 <TabsTrigger
                   value="expenses"
-                  className="h-9 px-4 text-white/75 data-active:bg-black data-active:text-white"
+                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
                 >
                   <ReceiptText /> Gastos
                 </TabsTrigger>
                 <TabsTrigger
                   value="investments"
-                  className="h-9 px-4 text-white/75 data-active:bg-black data-active:text-white"
+                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
                 >
                   <PiggyBank /> Investimentos
                 </TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2 rounded-xl border border-black/15 bg-black/20 px-3 py-2">
+              <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
                 <span className="grid size-7 place-items-center rounded-full bg-white text-xs font-bold text-black">
                   {user.displayName.charAt(0).toUpperCase()}
                 </span>
@@ -569,7 +569,7 @@ export default function Home() {
                   }
                   variant="ghost"
                   size="icon-sm"
-                  className="text-white/75 hover:bg-black/20 hover:text-white"
+                  className="text-white/75 hover:bg-[#292d35]/80 hover:text-white"
                 >
                   <LogOut />
                 </Button>
@@ -579,7 +579,7 @@ export default function Home() {
         </nav>
 
         <TabsContent value="expenses" className="pb-16">
-          <header className="finance-grid border-b border-black/15 bg-[#f97316] text-white">
+          <header className="finance-grid border-b border-white/15 bg-[#c2410c] text-white">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
@@ -595,7 +595,7 @@ export default function Home() {
                     aria-label="Mês anterior"
                     size="icon"
                     onClick={() => changeMonth(-1)}
-                    className="border border-black/15 bg-black/20 text-white hover:bg-black/30"
+                    className="border border-white/15 bg-[#292d35]/80 text-white hover:bg-[#343943]"
                   >
                     <ChevronLeft />
                   </Button>
@@ -603,7 +603,7 @@ export default function Home() {
                     aria-label="Próximo mês"
                     size="icon"
                     onClick={() => changeMonth(1)}
-                    className="border border-black/15 bg-black/20 text-white hover:bg-black/30"
+                    className="border border-white/15 bg-[#292d35]/80 text-white hover:bg-[#343943]"
                   >
                     <ChevronRight />
                   </Button>
@@ -1026,7 +1026,7 @@ function AuthScreen({
   onRetry: () => void;
 }) {
   return (
-    <main className="finance-grid min-h-screen bg-[#f97316] text-white">
+    <main className="finance-grid min-h-screen bg-[#c2410c] text-white">
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
         <section>
           <div className="mb-9 flex items-center gap-3">
@@ -1053,14 +1053,14 @@ function AuthScreen({
           </p>
 
           <div className="mt-8 grid max-w-lg gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-black/15 bg-black/20 p-4">
+            <div className="rounded-xl border border-white/15 bg-[#292d35]/80 p-4">
               <ShieldCheck className="mb-3 size-5 text-white" />
               <p className="font-semibold">Dados isolados</p>
               <p className="mt-1 text-sm leading-6 text-white/70">
                 Consultas e alterações são vinculadas à conta autenticada.
               </p>
             </div>
-            <div className="rounded-xl border border-black/15 bg-black/20 p-4">
+            <div className="rounded-xl border border-white/15 bg-[#292d35]/80 p-4">
               <LockKeyhole className="mb-3 size-5 text-white" />
               <p className="font-semibold">Senha fora do app</p>
               <p className="mt-1 text-sm leading-6 text-white/70">
@@ -1070,7 +1070,7 @@ function AuthScreen({
           </div>
         </section>
 
-        <Card className="border-white/15 bg-black text-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+        <Card className="border-white/15 bg-[#242830] text-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
           <CardHeader className="border-b border-white/10 pb-5">
             <CardTitle className="text-2xl font-bold tracking-[-0.04em]">
               Acesse seu espaço
@@ -1149,8 +1149,8 @@ function SummaryCard({
 }) {
   const styles = {
     positive: 'border-white/25 bg-white/10 text-white',
-    negative: 'border-black/15 bg-black/15 text-white',
-    balance: 'border-black/15 bg-black/20 text-white',
+    negative: 'border-white/15 bg-[#292d35]/70 text-white',
+    balance: 'border-white/15 bg-[#292d35]/80 text-white',
   };
   return (
     <div className={`rounded-2xl border p-5 backdrop-blur-sm ${styles[tone]}`}>
