@@ -489,7 +489,7 @@ export default function Home() {
 
   if (sessionLoading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#c2410c] text-white">
+      <main className="brand-sunset grid min-h-screen place-items-center text-white">
         <div className="text-center">
           <LoaderCircle className="mx-auto size-8 animate-spin text-white" />
           <p className="mt-3 text-sm text-slate-300">
@@ -516,7 +516,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Tabs defaultValue="expenses" className="gap-0">
-        <nav className="border-b border-white/15 bg-[#c2410c] text-white">
+        <nav className="brand-sunset border-b border-white/15 text-white">
           <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
@@ -579,7 +579,7 @@ export default function Home() {
         </nav>
 
         <TabsContent value="expenses" className="pb-16">
-          <header className="finance-grid border-b border-white/15 bg-[#c2410c] text-white">
+          <header className="brand-sunset finance-grid border-b border-white/15 text-white">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
@@ -1026,7 +1026,7 @@ function AuthScreen({
   onRetry: () => void;
 }) {
   return (
-    <main className="finance-grid min-h-screen bg-[#c2410c] text-white">
+    <main className="brand-sunset finance-grid min-h-screen text-white">
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
         <section>
           <div className="mb-9 flex items-center gap-3">

@@ -53,19 +53,19 @@ body {
 }
 
 :root {
-  --background: oklch(0.53 0.18 42);
+  --background: #f4513e;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.25 0.012 255);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.28 0.012 255);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.53 0.18 42);
+  --primary: #f4513e;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.31 0.012 255);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.31 0.012 255);
   --muted-foreground: oklch(0.75 0 0);
-  --accent: oklch(0.47 0.16 42);
+  --accent: #ef3340;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(1 0 0 / 18%);
@@ -94,6 +94,18 @@ body {
   background-size: 32px 32px;
 }
 
+.brand-sunset {
+  background-color: #f4513e;
+  background-image:
+    radial-gradient(
+      circle at 8% 100%,
+      rgba(255, 167, 101, 0.98),
+      transparent 42%
+    ),
+    radial-gradient(circle at 96% 4%, rgba(236, 12, 38, 0.94), transparent 44%),
+    linear-gradient(125deg, #ff7a4f 0%, #f4513e 48%, #ef1e32 100%);
+}
+
 .investment-grid {
   background-image:
     radial-gradient(circle at 80% 20%, rgba(51, 55, 64, 0.3), transparent 30%),
@@ -106,19 +118,19 @@ body {
 }
 
 .dark {
-  --background: oklch(0.48 0.17 42);
+  --background: #e84337;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.23 0.012 255);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.26 0.012 255);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.53 0.18 42);
+  --primary: #f4513e;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.29 0.012 255);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.29 0.012 255);
   --muted-foreground: oklch(0.75 0 0);
-  --accent: oklch(0.45 0.15 42);
+  --accent: #e92d3b;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);

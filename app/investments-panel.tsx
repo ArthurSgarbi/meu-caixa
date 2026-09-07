@@ -296,8 +296,8 @@ export function InvestmentsPanel() {
   const profitIsPositive = data.summary.profitCents >= 0;
 
   return (
-    <section className="min-h-[calc(100vh-81px)] bg-[#c2410c] pb-16">
-      <header className="investment-grid bg-[#c2410c] text-white">
+    <section className="brand-sunset min-h-[calc(100vh-81px)] pb-16">
+      <header className="investment-grid text-white">
         <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -436,7 +436,7 @@ export function InvestmentsPanel() {
                 type="submit"
                 size="lg"
                 disabled={saving || loading}
-                className="h-11 w-full bg-[#c2410c] font-semibold text-white hover:bg-[#9a3412]"
+                className="h-11 w-full bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
               >
                 {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
                 {saving ? 'Adicionando...' : 'Adicionar investimento'}
@@ -750,7 +750,7 @@ export function InvestmentsPanel() {
                 <Button
                   type="submit"
                   disabled={editSaving}
-                  className="bg-[#c2410c] text-white hover:bg-[#9a3412]"
+                  className="bg-[#f4513e] text-white hover:bg-[#e83232]"
                 >
                   {editSaving && <LoaderCircle className="animate-spin" />}
                   {editSaving ? 'Salvando...' : 'Salvar alterações'}
