@@ -17,10 +17,15 @@ import {
   ChevronRight,
   CircleDollarSign,
   LoaderCircle,
+  LockKeyhole,
+  LogIn,
+  LogOut,
   Pencil,
   PiggyBank,
   Plus,
   ReceiptText,
+  ShieldCheck,
+  UserPlus,
   WalletCards,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -88,6 +93,19 @@ type CreateTransactionInput = {
 };
 
 type UpdateTransactionInput = CreateTransactionInput & { id: number };
+
+type SessionData = {
+  authenticated: boolean;
+  user: {
+    displayName: string;
+    email: string;
+  } | null;
+  signInPath: string;
+  signOutPath: string;
+};
+
+const defaultSignInPath = '/signin-with-chatgpt?return_to=%2F';
+const defaultSignOutPath = '/signout-with-chatgpt?return_to=%2F';
 
 declare global {
   interface Document {
@@ -213,6 +231,9 @@ function validateToolInput(input: unknown): CreateTransactionInput {
 }
 
 export default function Home() {
+  const [session, setSession] = useState<SessionData | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [sessionError, setSessionError] = useState('');
   const [month, setMonth] = useState(currentMonth);
   const [data, setData] = useState<FinanceData>(emptyData);
   const [loading, setLoading] = useState(true);
@@ -227,6 +248,41 @@ export default function Home() {
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+
+  const loadSession = useCallback(async (signal?: AbortSignal) => {
+    setSessionError('');
+    try {
+      const response = await fetch('/api/session', { signal });
+      const result = (await response.json()) as SessionData;
+      if (!response.ok)
+        throw new Error('Não foi possível verificar sua conta.');
+      setSession(result);
+    } catch (requestError) {
+      if (
+        requestError instanceof DOMException &&
+        requestError.name === 'AbortError'
+      ) {
+        return;
+      }
+      setSessionError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível verificar sua conta.',
+      );
+    } finally {
+      if (!signal?.aborted) setSessionLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) void loadSession(controller.signal);
+    });
+    return () => controller.abort();
+  }, [loadSession]);
+
+  const user = session?.authenticated ? session.user : null;
 
   const loadData = useCallback(
     async (selectedMonth: string, signal?: AbortSignal) => {
@@ -262,12 +318,13 @@ export default function Home() {
   );
 
   useEffect(() => {
+    if (!user) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (!controller.signal.aborted) void loadData(month, controller.signal);
     });
     return () => controller.abort();
-  }, [loadData, month]);
+  }, [loadData, month, user]);
 
   const availableCategories = useMemo(
     () => data.categories.filter((category) => category.type === type),
@@ -296,6 +353,7 @@ export default function Home() {
       : '';
 
   useEffect(() => {
+    if (!user) return;
     const context = document.modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
@@ -342,7 +400,7 @@ export default function Home() {
     ).catch(() => undefined);
 
     return () => lifecycle.abort();
-  }, [loadData, month]);
+  }, [loadData, month, user]);
 
   function changeMonth(offset: number) {
     const [year, monthNumber] = month.split('-').map(Number);
@@ -429,6 +487,32 @@ export default function Home() {
 
   const monthLabel = monthFormatter.format(new Date(`${month}-01T00:00:00Z`));
 
+  if (sessionLoading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#091b32] text-white">
+        <div className="text-center">
+          <LoaderCircle className="mx-auto size-8 animate-spin text-[#2de29b]" />
+          <p className="mt-3 text-sm text-slate-300">
+            Protegendo seus dados...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthScreen
+        signInPath={session?.signInPath ?? defaultSignInPath}
+        error={sessionError}
+        onRetry={() => {
+          setSessionLoading(true);
+          void loadSession();
+        }}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <Tabs defaultValue="expenses" className="gap-0">
@@ -447,20 +531,50 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <TabsList className="h-11 rounded-xl border border-white/10 bg-white/10 p-1">
-              <TabsTrigger
-                value="expenses"
-                className="h-9 px-4 text-slate-300 data-active:bg-white data-active:text-[#091b32]"
-              >
-                <ReceiptText /> Gastos
-              </TabsTrigger>
-              <TabsTrigger
-                value="investments"
-                className="h-9 px-4 text-slate-300 data-active:bg-violet-100 data-active:text-violet-950"
-              >
-                <PiggyBank /> Investimentos
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <TabsList className="h-11 rounded-xl border border-white/10 bg-white/10 p-1">
+                <TabsTrigger
+                  value="expenses"
+                  className="h-9 px-4 text-slate-300 data-active:bg-white data-active:text-[#091b32]"
+                >
+                  <ReceiptText /> Gastos
+                </TabsTrigger>
+                <TabsTrigger
+                  value="investments"
+                  className="h-9 px-4 text-slate-300 data-active:bg-violet-100 data-active:text-violet-950"
+                >
+                  <PiggyBank /> Investimentos
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[.07] px-3 py-2">
+                <span className="grid size-7 place-items-center rounded-full bg-[#2de29b] text-xs font-bold text-[#08243b]">
+                  {user.displayName.charAt(0).toUpperCase()}
+                </span>
+                <div className="hidden max-w-36 sm:block">
+                  <p className="truncate text-xs font-semibold">
+                    {user.displayName}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-400">
+                    Conta protegida
+                  </p>
+                </div>
+                <Button
+                  nativeButton={false}
+                  render={
+                    <a
+                      href={session?.signOutPath ?? defaultSignOutPath}
+                      target="_top"
+                      aria-label="Sair da conta"
+                    />
+                  }
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-slate-300 hover:bg-white/10 hover:text-white"
+                >
+                  <LogOut />
+                </Button>
+              </div>
+            </div>
           </div>
         </nav>
 
@@ -900,6 +1014,124 @@ export default function Home() {
           <InvestmentsPanel />
         </TabsContent>
       </Tabs>
+    </main>
+  );
+}
+
+function AuthScreen({
+  signInPath,
+  error,
+  onRetry,
+}: {
+  signInPath: string;
+  error: string;
+  onRetry: () => void;
+}) {
+  return (
+    <main className="finance-grid min-h-screen bg-[#091b32] text-white">
+      <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
+        <section>
+          <div className="mb-9 flex items-center gap-3">
+            <span className="grid size-11 place-items-center rounded-xl bg-[#2de29b] text-[#08243b] shadow-[0_8px_24px_rgba(45,226,155,.25)]">
+              <CircleDollarSign className="size-6" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-xl font-bold tracking-[-0.03em]">Meu Caixa</p>
+              <p className="text-sm text-slate-300">
+                Suas finanças, somente suas
+              </p>
+            </div>
+          </div>
+
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[.16em] text-[#65e6b2]">
+            Controle pessoal e seguro
+          </p>
+          <h1 className="max-w-xl text-4xl font-bold tracking-[-0.05em] sm:text-5xl">
+            Cada pessoa acessa apenas o próprio caixa.
+          </h1>
+          <p className="mt-5 max-w-lg text-base leading-7 text-slate-300">
+            Entre para registrar gastos, receitas e investimentos em uma área
+            individual, protegida pela sua conta.
+          </p>
+
+          <div className="mt-8 grid max-w-lg gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-white/10 bg-white/[.06] p-4">
+              <ShieldCheck className="mb-3 size-5 text-[#65e6b2]" />
+              <p className="font-semibold">Dados isolados</p>
+              <p className="mt-1 text-sm leading-6 text-slate-400">
+                Consultas e alterações são vinculadas à conta autenticada.
+              </p>
+            </div>
+            <div className="rounded-xl border border-white/10 bg-white/[.06] p-4">
+              <LockKeyhole className="mb-3 size-5 text-[#65e6b2]" />
+              <p className="font-semibold">Senha fora do app</p>
+              <p className="mt-1 text-sm leading-6 text-slate-400">
+                A autenticação é feita com segurança pela conta ChatGPT.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <Card className="border-white/10 bg-white text-slate-950 shadow-[0_30px_80px_rgba(0,0,0,.25)]">
+          <CardHeader className="border-b border-slate-100 pb-5">
+            <CardTitle className="text-2xl font-bold tracking-[-0.04em]">
+              Acesse seu espaço
+            </CardTitle>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Use sua conta ChatGPT para entrar ou criar um novo cadastro.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-6">
+            {error && (
+              <output className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  {error}{' '}
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    Tentar novamente
+                  </button>
+                </span>
+              </output>
+            )}
+            <Button
+              nativeButton={false}
+              render={
+                <a
+                  href={signInPath}
+                  target="_top"
+                  aria-label="Entrar com ChatGPT"
+                />
+              }
+              size="lg"
+              className="h-12 w-full text-base font-semibold"
+            >
+              <LogIn /> Entrar com ChatGPT
+            </Button>
+            <Button
+              nativeButton={false}
+              render={
+                <a
+                  href={signInPath}
+                  target="_top"
+                  aria-label="Criar minha conta"
+                />
+              }
+              variant="outline"
+              size="lg"
+              className="h-12 w-full text-base font-semibold"
+            >
+              <UserPlus /> Criar minha conta
+            </Button>
+            <p className="px-3 pt-3 text-center text-xs leading-5 text-muted-foreground">
+              O Meu Caixa não recebe nem armazena sua senha.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }

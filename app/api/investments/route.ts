@@ -1,4 +1,7 @@
 import { getDb } from '@/db';
+import { getChatGPTUser } from '@/app/chatgpt-auth';
+
+export const dynamic = 'force-dynamic';
 
 const assetClasses = new Set([
   'Renda fixa',
@@ -55,6 +58,14 @@ function parseInvestmentInput(
 
 export async function GET() {
   try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para acessar seus investimentos.' },
+        { status: 401 },
+      );
+    }
+
     const db = getDb();
     const [investmentsResult, summaryResult, allocationResult] =
       await Promise.all([
@@ -65,24 +76,30 @@ export async function GET() {
                     current_value_cents AS currentValueCents,
                     acquisition_date AS acquisitionDate
                FROM investments
+              WHERE owner_id = ?
               ORDER BY current_value_cents DESC, id DESC`,
           )
+          .bind(user.userId)
           .all(),
         db
           .prepare(
             `SELECT COALESCE(SUM(invested_cents), 0) AS investedCents,
                     COALESCE(SUM(current_value_cents), 0) AS currentValueCents
-               FROM investments`,
+               FROM investments
+              WHERE owner_id = ?`,
           )
+          .bind(user.userId)
           .first(),
         db
           .prepare(
             `SELECT asset_class AS assetClass,
                     SUM(current_value_cents) AS currentValueCents
                FROM investments
+              WHERE owner_id = ?
               GROUP BY asset_class
               ORDER BY currentValueCents DESC`,
           )
+          .bind(user.userId)
           .all(),
       ]);
 
@@ -112,6 +129,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para registrar um investimento.' },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as Record<string, unknown>;
     const parsed = parseInvestmentInput(body);
     if ('error' in parsed) {
@@ -131,8 +156,8 @@ export async function POST(request: Request) {
       .prepare(
         `INSERT INTO investments
           (name, asset_class, invested_cents, current_value_cents,
-           acquisition_date, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           acquisition_date, owner_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         name,
@@ -140,6 +165,7 @@ export async function POST(request: Request) {
         investedCents,
         currentValueCents,
         acquisitionDate,
+        user.userId,
         now,
         now,
       )
@@ -157,6 +183,14 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para editar um investimento.' },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as Record<string, unknown>;
     const id = Number(body.id);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -184,7 +218,7 @@ export async function PATCH(request: Request) {
         `UPDATE investments
             SET name = ?, asset_class = ?, invested_cents = ?,
                 current_value_cents = ?, acquisition_date = ?, updated_at = ?
-          WHERE id = ?`,
+          WHERE id = ? AND owner_id = ?`,
       )
       .bind(
         name,
@@ -194,6 +228,7 @@ export async function PATCH(request: Request) {
         acquisitionDate,
         new Date().toISOString(),
         id,
+        user.userId,
       )
       .run();
 

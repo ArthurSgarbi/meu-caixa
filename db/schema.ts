@@ -32,9 +32,14 @@ export const transactions = sqliteTable(
     categoryId: integer('category_id')
       .notNull()
       .references(() => categories.id),
+    ownerId: text('owner_id').notNull().default(''),
     createdAt: text('created_at').notNull(),
   },
   (table) => [
+    index('idx_transactions_owner_date').on(
+      table.ownerId,
+      table.transactionDate,
+    ),
     index('idx_transactions_date').on(table.transactionDate),
     index('idx_transactions_category_date').on(
       table.categoryId,
@@ -52,10 +57,15 @@ export const budgets = sqliteTable(
       .references(() => categories.id),
     month: text('month').notNull(),
     limitCents: integer('limit_cents').notNull(),
+    ownerId: text('owner_id').notNull().default(''),
     createdAt: text('created_at').notNull(),
   },
   (table) => [
-    uniqueIndex('idx_budgets_category_month').on(table.categoryId, table.month),
+    uniqueIndex('idx_budgets_owner_category_month').on(
+      table.ownerId,
+      table.categoryId,
+      table.month,
+    ),
   ],
 );
 
@@ -76,8 +86,15 @@ export const investments = sqliteTable(
     investedCents: integer('invested_cents').notNull(),
     currentValueCents: integer('current_value_cents').notNull(),
     acquisitionDate: text('acquisition_date').notNull(),
+    ownerId: text('owner_id').notNull().default(''),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
-  (table) => [index('idx_investments_asset_class').on(table.assetClass)],
+  (table) => [
+    index('idx_investments_owner_asset_class').on(
+      table.ownerId,
+      table.assetClass,
+    ),
+    index('idx_investments_asset_class').on(table.assetClass),
+  ],
 );

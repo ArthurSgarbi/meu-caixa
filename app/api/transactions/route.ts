@@ -1,4 +1,7 @@
 import { getDb } from '@/db';
+import { getChatGPTUser } from '@/app/chatgpt-auth';
+
+export const dynamic = 'force-dynamic';
 
 const categorySeeds = [
   ['alimentacao', 'Alimentação', 'expense'],
@@ -91,6 +94,14 @@ async function seedCategories(db: D1Database) {
 }
 
 export async function GET(request: Request) {
+  const user = await getChatGPTUser();
+  if (!user) {
+    return Response.json(
+      { error: 'Entre na sua conta para acessar seus dados.' },
+      { status: 401 },
+    );
+  }
+
   const url = new URL(request.url);
   const month = url.searchParams.get('month') ?? '';
   const range = getMonthRange(month);
@@ -115,10 +126,11 @@ export async function GET(request: Request) {
                   c.name AS categoryName
              FROM transactions t
              JOIN categories c ON c.id = t.category_id
-            WHERE t.transaction_date >= ? AND t.transaction_date < ?
+            WHERE t.owner_id = ?
+              AND t.transaction_date >= ? AND t.transaction_date < ?
             ORDER BY t.transaction_date DESC, t.id DESC`,
           )
-          .bind(range.start, range.next)
+          .bind(user.userId, range.start, range.next)
           .all(),
         db
           .prepare(
@@ -126,9 +138,10 @@ export async function GET(request: Request) {
              COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS incomeCents,
              COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expenseCents
            FROM transactions
-           WHERE transaction_date >= ? AND transaction_date < ?`,
+           WHERE owner_id = ?
+             AND transaction_date >= ? AND transaction_date < ?`,
           )
-          .bind(range.start, range.next)
+          .bind(user.userId, range.start, range.next)
           .first(),
         db
           .prepare('SELECT id, name, type FROM categories ORDER BY type, name')
@@ -158,6 +171,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para registrar uma transação.' },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as Record<string, unknown>;
     const parsed = parseTransactionInput(body);
     if ('error' in parsed) {
@@ -180,8 +201,9 @@ export async function POST(request: Request) {
     const result = await db
       .prepare(
         `INSERT INTO transactions
-          (description, type, amount_cents, transaction_date, category_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+          (description, type, amount_cents, transaction_date, category_id,
+           owner_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         description,
@@ -189,6 +211,7 @@ export async function POST(request: Request) {
         amountCents,
         transactionDate,
         categoryId,
+        user.userId,
         new Date().toISOString(),
       )
       .run();
@@ -205,6 +228,14 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para editar uma transação.' },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as Record<string, unknown>;
     const id = Number(body.id);
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -236,9 +267,17 @@ export async function PATCH(request: Request) {
         `UPDATE transactions
             SET description = ?, type = ?, amount_cents = ?,
                 transaction_date = ?, category_id = ?
-          WHERE id = ?`,
+          WHERE id = ? AND owner_id = ?`,
       )
-      .bind(description, type, amountCents, transactionDate, categoryId, id)
+      .bind(
+        description,
+        type,
+        amountCents,
+        transactionDate,
+        categoryId,
+        id,
+        user.userId,
+      )
       .run();
 
     if (result.meta.changes === 0) {
