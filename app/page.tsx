@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
+  CreditCard,
   LoaderCircle,
   LockKeyhole,
   LogIn,
@@ -54,6 +55,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CreditCardsPanel } from './credit-cards-panel';
 import { InvestmentsPanel } from './investments-panel';
 
 type TransactionType = 'income' | 'expense';
@@ -532,7 +534,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-3">
-              <TabsList className="h-11 rounded-xl border border-white/15 bg-[#292d35]/80 p-1">
+              <TabsList className="h-auto flex-wrap rounded-xl border border-white/15 bg-[#292d35]/80 p-1">
                 <TabsTrigger
                   value="expenses"
                   className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
@@ -544,6 +546,12 @@ export default function Home() {
                   className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
                 >
                   <PiggyBank /> Investimentos
+                </TabsTrigger>
+                <TabsTrigger
+                  value="credit-cards"
+                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                >
+                  <CreditCard /> Cartões
                 </TabsTrigger>
               </TabsList>
               <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
@@ -1010,6 +1018,10 @@ export default function Home() {
 
         <TabsContent value="investments">
           <InvestmentsPanel />
+        </TabsContent>
+
+        <TabsContent value="credit-cards">
+          <CreditCardsPanel />
         </TabsContent>
       </Tabs>
     </main>

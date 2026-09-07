@@ -98,3 +98,79 @@ export const investments = sqliteTable(
     index('idx_investments_asset_class').on(table.assetClass),
   ],
 );
+
+export const creditCards = sqliteTable(
+  'credit_cards',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    ownerId: text('owner_id').notNull(),
+    name: text('name').notNull(),
+    brand: text('brand').notNull(),
+    lastFour: text('last_four').notNull(),
+    creditLimitCents: integer('credit_limit_cents').notNull(),
+    closingDay: integer('closing_day').notNull(),
+    dueDay: integer('due_day').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    index('idx_credit_cards_owner').on(table.ownerId),
+    uniqueIndex('idx_credit_cards_owner_name').on(table.ownerId, table.name),
+  ],
+);
+
+export const creditCardInvoices = sqliteTable(
+  'credit_card_invoices',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    cardId: integer('card_id')
+      .notNull()
+      .references(() => creditCards.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id').notNull(),
+    referenceMonth: text('reference_month').notNull(),
+    closingDate: text('closing_date').notNull(),
+    dueDate: text('due_date').notNull(),
+    status: text('status', { enum: ['open', 'closed', 'paid'] })
+      .notNull()
+      .default('open'),
+    paidAt: text('paid_at'),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('idx_card_invoices_card_month').on(
+      table.cardId,
+      table.referenceMonth,
+    ),
+    index('idx_card_invoices_owner_month').on(
+      table.ownerId,
+      table.referenceMonth,
+    ),
+  ],
+);
+
+export const creditCardTransactions = sqliteTable(
+  'credit_card_transactions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    cardId: integer('card_id')
+      .notNull()
+      .references(() => creditCards.id, { onDelete: 'cascade' }),
+    invoiceId: integer('invoice_id')
+      .notNull()
+      .references(() => creditCardInvoices.id, { onDelete: 'cascade' }),
+    ownerId: text('owner_id').notNull(),
+    purchaseGroupId: text('purchase_group_id').notNull(),
+    description: text('description').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    purchaseDate: text('purchase_date').notNull(),
+    installmentNumber: integer('installment_number').notNull().default(1),
+    installmentCount: integer('installment_count').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('idx_card_transactions_owner_card').on(table.ownerId, table.cardId),
+    index('idx_card_transactions_invoice').on(table.invoiceId),
+    index('idx_card_transactions_purchase_group').on(table.purchaseGroupId),
+  ],
+);
