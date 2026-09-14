@@ -1,6 +1,5 @@
-import { env } from 'cloudflare:workers';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { getDb } from '@/db';
+import { getDb, type Database } from '@/db';
 import { ASSISTANT_SYSTEM_PROMPT } from '@/lib/assistant-system-prompt';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +71,7 @@ function extractOutputText(response: OpenAIResponse) {
     .trim();
 }
 
-async function loadFinancialContext(db: D1Database, ownerId: string) {
+async function loadFinancialContext(db: Database, ownerId: string) {
   const { month, start, next } = getMonthRange();
 
   // Todas as consultas pessoais exigem owner_id. Essa é a barreira que impede
@@ -255,7 +254,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = env.OPENAI_API_KEY;
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return Response.json(
         {
@@ -277,7 +276,7 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: env.OPENAI_MODEL || 'gpt-5.4-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-5.4-mini',
         instructions: `${ASSISTANT_SYSTEM_PROMPT}\n\n<contexto_financeiro>\n${JSON.stringify(financialContext)}\n</contexto_financeiro>`,
         input: [...history, { role: 'user', content: message }],
         max_output_tokens: 700,

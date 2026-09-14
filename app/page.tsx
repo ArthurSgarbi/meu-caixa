@@ -1,5 +1,6 @@
 'use client';
 
+import { useClerk } from '@clerk/nextjs';
 import {
   ReactNode,
   SyntheticEvent,
@@ -107,11 +108,11 @@ type SessionData = {
     email: string;
   } | null;
   signInPath: string;
-  signOutPath: string;
+  signUpPath: string;
 };
 
-const defaultSignInPath = '/signin-with-chatgpt?return_to=%2F';
-const defaultSignOutPath = '/signout-with-chatgpt?return_to=%2F';
+const defaultSignInPath = '/sign-in?redirect_url=%2F';
+const defaultSignUpPath = '/sign-up?redirect_url=%2F';
 
 declare global {
   interface Document {
@@ -237,6 +238,7 @@ function validateToolInput(input: unknown): CreateTransactionInput {
 }
 
 export default function Home() {
+  const { signOut } = useClerk();
   const [session, setSession] = useState<SessionData | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState('');
@@ -585,6 +587,7 @@ export default function Home() {
     return (
       <AuthScreen
         signInPath={session?.signInPath ?? defaultSignInPath}
+        signUpPath={session?.signUpPath ?? defaultSignUpPath}
         error={sessionError}
         onRetry={() => {
           setSessionLoading(true);
@@ -658,14 +661,9 @@ export default function Home() {
                   </p>
                 </div>
                 <Button
-                  nativeButton={false}
-                  render={
-                    <a
-                      href={session?.signOutPath ?? defaultSignOutPath}
-                      target="_top"
-                      aria-label="Sair da conta"
-                    />
-                  }
+                  type="button"
+                  onClick={() => void signOut({ redirectUrl: '/' })}
+                  aria-label="Sair da conta"
                   variant="ghost"
                   size="icon-sm"
                   className="text-white/75 hover:bg-[#292d35]/80 hover:text-white"
@@ -1238,10 +1236,12 @@ export default function Home() {
 
 function AuthScreen({
   signInPath,
+  signUpPath,
   error,
   onRetry,
 }: {
   signInPath: string;
+  signUpPath: string;
   error: string;
   onRetry: () => void;
 }) {
@@ -1284,7 +1284,7 @@ function AuthScreen({
               <LockKeyhole className="mb-3 size-5 text-white" />
               <p className="font-semibold">Senha fora do app</p>
               <p className="mt-1 text-sm leading-6 text-white/70">
-                A autenticação é feita com segurança pela conta ChatGPT.
+                A autenticação é feita pelo Clerk, sem armazenar sua senha.
               </p>
             </div>
           </div>
@@ -1296,7 +1296,7 @@ function AuthScreen({
               Acesse seu espaço
             </CardTitle>
             <p className="text-sm leading-6 text-muted-foreground">
-              Use sua conta ChatGPT para entrar ou criar um novo cadastro.
+              Entre com segurança ou crie seu cadastro individual.
             </p>
           </CardHeader>
           <CardContent className="space-y-3 pt-6">
@@ -1321,19 +1321,19 @@ function AuthScreen({
                 <a
                   href={signInPath}
                   target="_top"
-                  aria-label="Entrar com ChatGPT"
+                  aria-label="Entrar na minha conta"
                 />
               }
               size="lg"
               className="h-12 w-full text-base font-semibold"
             >
-              <LogIn /> Entrar com ChatGPT
+              <LogIn /> Entrar
             </Button>
             <Button
               nativeButton={false}
               render={
                 <a
-                  href={signInPath}
+                  href={signUpPath}
                   target="_top"
                   aria-label="Criar minha conta"
                 />

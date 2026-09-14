@@ -1,15 +1,16 @@
 import {
   index,
   integer,
-  sqliteTable,
+  pgTable,
+  serial,
   text,
   uniqueIndex,
-} from 'drizzle-orm/sqlite-core';
+} from 'drizzle-orm/pg-core';
 
-export const categories = sqliteTable(
+export const categories = pgTable(
   'categories',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     name: text('name').notNull(),
     slug: text('slug').notNull(),
     type: text('type', { enum: ['income', 'expense'] }).notNull(),
@@ -21,10 +22,10 @@ export const categories = sqliteTable(
   ],
 );
 
-export const transactions = sqliteTable(
+export const transactions = pgTable(
   'transactions',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     description: text('description').notNull(),
     type: text('type', { enum: ['income', 'expense'] }).notNull(),
     amountCents: integer('amount_cents').notNull(),
@@ -48,10 +49,10 @@ export const transactions = sqliteTable(
   ],
 );
 
-export const budgets = sqliteTable(
+export const budgets = pgTable(
   'budgets',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     categoryId: integer('category_id')
       .notNull()
       .references(() => categories.id),
@@ -69,10 +70,10 @@ export const budgets = sqliteTable(
   ],
 );
 
-export const investments = sqliteTable(
+export const investments = pgTable(
   'investments',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     name: text('name').notNull(),
     assetClass: text('asset_class', {
       enum: [
@@ -99,10 +100,10 @@ export const investments = sqliteTable(
   ],
 );
 
-export const investmentWallets = sqliteTable(
+export const investmentWallets = pgTable(
   'investment_wallets',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     ownerId: text('owner_id').notNull(),
     balanceCents: integer('balance_cents').notNull().default(0),
     annualCdiRateBps: integer('annual_cdi_rate_bps').notNull().default(1050),
@@ -113,10 +114,10 @@ export const investmentWallets = sqliteTable(
   (table) => [uniqueIndex('idx_investment_wallets_owner').on(table.ownerId)],
 );
 
-export const investmentContributions = sqliteTable(
+export const investmentContributions = pgTable(
   'investment_contributions',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     walletId: integer('wallet_id')
       .notNull()
       .references(() => investmentWallets.id, { onDelete: 'cascade' }),
@@ -135,10 +136,10 @@ export const investmentContributions = sqliteTable(
   ],
 );
 
-export const savedSimulations = sqliteTable(
+export const savedSimulations = pgTable(
   'saved_simulations',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     ownerId: text('owner_id').notNull(),
     name: text('name').notNull(),
     simulationType: text('simulation_type', {
@@ -161,10 +162,10 @@ export const savedSimulations = sqliteTable(
   ],
 );
 
-export const creditCards = sqliteTable(
+export const creditCards = pgTable(
   'credit_cards',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     ownerId: text('owner_id').notNull(),
     name: text('name').notNull(),
     brand: text('brand').notNull(),
@@ -181,10 +182,10 @@ export const creditCards = sqliteTable(
   ],
 );
 
-export const creditCardInvoices = sqliteTable(
+export const creditCardInvoices = pgTable(
   'credit_card_invoices',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     cardId: integer('card_id')
       .notNull()
       .references(() => creditCards.id, { onDelete: 'cascade' }),
@@ -211,10 +212,10 @@ export const creditCardInvoices = sqliteTable(
   ],
 );
 
-export const creditCardTransactions = sqliteTable(
+export const creditCardTransactions = pgTable(
   'credit_card_transactions',
   {
-    id: integer('id').primaryKey({ autoIncrement: true }),
+    id: serial('id').primaryKey(),
     cardId: integer('card_id')
       .notNull()
       .references(() => creditCards.id, { onDelete: 'cascade' }),

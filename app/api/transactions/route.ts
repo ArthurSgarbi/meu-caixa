@@ -1,4 +1,4 @@
-import { getDb } from '@/db';
+import { getDb, type Database } from '@/db';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 
 export const dynamic = 'force-dynamic';
@@ -60,7 +60,7 @@ function parseTransactionInput(
 }
 
 async function categoryMatchesType(
-  db: D1Database,
+  db: Database,
   categoryId: number,
   type: TransactionType,
 ) {
@@ -80,7 +80,7 @@ function getMonthRange(month: string) {
   return { start, next };
 }
 
-async function seedCategories(db: D1Database) {
+async function seedCategories(db: Database) {
   const now = new Date().toISOString();
   await db.batch(
     categorySeeds.map(([slug, name, type]) =>
