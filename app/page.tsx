@@ -601,7 +601,7 @@ export default function Home() {
     <main className="brand-sunset min-h-screen text-white">
       <Tabs defaultValue="expenses" className="gap-0">
         <nav className="border-b border-white/15 text-white">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
+          <div className="mx-auto flex max-w-7xl min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
                 <CircleDollarSign className="size-5" aria-hidden="true" />
@@ -615,40 +615,40 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-3">
-              <TabsList className="h-auto flex-wrap rounded-xl border border-white/15 bg-[#292d35]/80 p-1">
+            <div className="flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-1 lg:justify-end">
+              <TabsList className="h-auto min-w-0 flex-1 flex-nowrap justify-start overflow-x-auto rounded-xl border border-white/15 bg-[#292d35]/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <TabsTrigger
                   value="expenses"
-                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#292d35] data-active:text-white sm:px-4"
                 >
                   <ReceiptText /> Gastos
                 </TabsTrigger>
                 <TabsTrigger
                   value="investments"
-                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#292d35] data-active:text-white sm:px-4"
                 >
                   <PiggyBank /> Investimentos
                 </TabsTrigger>
                 <TabsTrigger
                   value="credit-cards"
-                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#292d35] data-active:text-white sm:px-4"
                 >
                   <CreditCard /> Cartões
                 </TabsTrigger>
                 <TabsTrigger
                   value="simulations"
-                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#292d35] data-active:text-white sm:px-4"
                 >
                   <ChartNoAxesCombined /> Simulações
                 </TabsTrigger>
                 <TabsTrigger
                   value="assistant"
-                  className="h-9 px-4 text-white/75 data-active:bg-[#292d35] data-active:text-white"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#292d35] data-active:text-white sm:px-4"
                 >
                   <Bot /> Assistente IA
                 </TabsTrigger>
               </TabsList>
-              <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
+              <div className="flex shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/80 px-3 py-2">
                 <span className="grid size-7 place-items-center rounded-full bg-white text-xs font-bold text-black">
                   {user.displayName.charAt(0).toUpperCase()}
                 </span>
