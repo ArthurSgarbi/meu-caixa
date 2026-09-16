@@ -248,3 +248,45 @@ export async function PATCH(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const user = await getChatGPTUser();
+    if (!user) {
+      return Response.json(
+        { error: 'Entre na sua conta para remover um investimento.' },
+        { status: 401 },
+      );
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = Number(body.id);
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return Response.json(
+        { error: 'Investimento inválido para remoção.' },
+        { status: 400 },
+      );
+    }
+
+    const db = getDb();
+    const result = await db
+      .prepare('DELETE FROM investments WHERE id = ? AND owner_id = ?')
+      .bind(id, user.userId)
+      .run();
+
+    if (result.meta.changes === 0) {
+      return Response.json(
+        { error: 'Investimento não encontrado.' },
+        { status: 404 },
+      );
+    }
+
+    return Response.json({ id, deleted: true });
+  } catch (error) {
+    console.error('Failed to delete investment', error);
+    return Response.json(
+      { error: 'Não foi possível remover o investimento.' },
+      { status: 500 },
+    );
+  }
+}

@@ -22,9 +22,20 @@ import {
   Pencil,
   Plus,
   Save,
+  Trash2,
   TrendingUp,
 } from 'lucide-react';
 import { Pie, PieChart, Tooltip } from 'recharts';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -193,6 +204,10 @@ export function InvestmentsPanel() {
   );
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+  const [deletingInvestment, setDeletingInvestment] =
+    useState<Investment | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [walletData, setWalletData] =
     useState<InvestmentWalletData>(emptyWalletData);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -435,6 +450,40 @@ export function InvestmentsPanel() {
       );
     } finally {
       setEditSaving(false);
+    }
+  }
+
+  async function handleDeleteInvestment() {
+    if (!deletingInvestment) return;
+
+    setDeleteSaving(true);
+    setDeleteError('');
+    try {
+      const response = await fetch('/api/investments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deletingInvestment.id }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(
+          result.error ?? 'Não foi possível remover o investimento.',
+        );
+      }
+
+      const removedName = deletingInvestment.name;
+      setDeletingInvestment(null);
+      setMessage(`${removedName} foi removido da sua carteira.`);
+      setError('');
+      await loadInvestments();
+    } catch (requestError) {
+      setDeleteError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível remover o investimento.',
+      );
+    } finally {
+      setDeleteSaving(false);
     }
   }
 
@@ -946,6 +995,19 @@ export function InvestmentsPanel() {
                           >
                             <Pencil />
                           </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={`Remover ${investment.name}`}
+                            className="text-red-300 hover:bg-red-950/70 hover:text-red-100"
+                            onClick={() => {
+                              setDeletingInvestment(investment);
+                              setDeleteError('');
+                            }}
+                          >
+                            <Trash2 />
+                          </Button>
                         </div>
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-3">
@@ -1089,6 +1151,52 @@ export function InvestmentsPanel() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deletingInvestment !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteSaving) {
+            setDeletingInvestment(null);
+            setDeleteError('');
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover investimento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingInvestment
+                ? `${deletingInvestment.name} será removido da carteira e dos gráficos. Esta ação não altera o histórico de aportes.`
+                : 'O investimento selecionado será removido da carteira.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteError && (
+            <output
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-lg bg-red-950/70 px-3 py-2.5 text-sm text-red-200"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              {deleteError}
+            </output>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSaving}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              disabled={deleteSaving}
+              className="bg-red-600 text-white hover:bg-red-700"
+              onClick={() => void handleDeleteInvestment()}
+            >
+              {deleteSaving && <LoaderCircle className="animate-spin" />}
+              {deleteSaving ? 'Removendo...' : 'Sim, remover'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
