@@ -1,6 +1,7 @@
 import {
   index,
   integer,
+  numeric,
   pgTable,
   serial,
   text,
@@ -86,6 +87,8 @@ export const investments = pgTable(
     }).notNull(),
     investedCents: integer('invested_cents').notNull(),
     currentValueCents: integer('current_value_cents').notNull(),
+    ticker: text('ticker'),
+    quantity: numeric('quantity', { precision: 20, scale: 8 }),
     acquisitionDate: text('acquisition_date').notNull(),
     ownerId: text('owner_id').notNull().default(''),
     createdAt: text('created_at').notNull(),
