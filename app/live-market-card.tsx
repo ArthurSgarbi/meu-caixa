@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   LoaderCircle,
   RefreshCw,
@@ -172,6 +174,17 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
   const selectedQuote = marketData?.quotes.find(
     (quote) => quote.ticker === selectedTicker,
   );
+  const selectedQuoteIndex = marketData?.quotes.findIndex(
+    (quote) => quote.ticker === selectedTicker,
+  ) ?? -1;
+
+  const moveCarousel = (direction: -1 | 1) => {
+    const quotes = marketData?.quotes ?? [];
+    if (quotes.length === 0) return;
+    const currentIndex = selectedQuoteIndex >= 0 ? selectedQuoteIndex : 0;
+    const nextIndex = (currentIndex + direction + quotes.length) % quotes.length;
+    setSelectedTicker(quotes[nextIndex].ticker);
+  };
   const livePortfolioValue = useMemo(
     () =>
       (marketData?.quotes ?? []).reduce(
@@ -286,6 +299,53 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
             </NativeSelect>
           </div>
         </div>
+
+        {marketData?.quotes.length ? (
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Ver ação anterior"
+              onClick={() => moveCarousel(-1)}
+              disabled={marketData.quotes.length < 2}
+            >
+              <ChevronLeft />
+            </Button>
+            <div
+              className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
+              aria-label="Navegação dos gráficos por ação"
+            >
+              {marketData.quotes.map((quote, index) => (
+                <button
+                  key={quote.ticker}
+                  type="button"
+                  aria-label={`Ver gráfico de ${quote.ticker}`}
+                  aria-current={index === selectedQuoteIndex ? 'true' : undefined}
+                  onClick={() => setSelectedTicker(quote.ticker)}
+                  className={`h-2 rounded-full transition-all ${
+                    index === selectedQuoteIndex
+                      ? 'w-7 bg-[#ff7557]'
+                      : 'w-2 bg-white/30 hover:bg-white/60'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {selectedQuoteIndex + 1}/{marketData.quotes.length}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              aria-label="Ver próxima ação"
+              onClick={() => moveCarousel(1)}
+              disabled={marketData.quotes.length < 2}
+            >
+              <ChevronRight />
+            </Button>
+          </div>
+        ) : null}
 
         {selectedQuote ? (
           <>
