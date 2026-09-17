@@ -55,6 +55,7 @@ import {
   NativeSelectOption,
 } from '@/components/ui/native-select';
 import { calculateDailyYield } from '@/lib/investment-calculations';
+import { LiveMarketCard } from './live-market-card';
 
 type Investment = {
   id: number;
@@ -62,6 +63,8 @@ type Investment = {
   assetClass: string;
   investedCents: number;
   currentValueCents: number;
+  ticker: string | null;
+  quantity: number | null;
   acquisitionDate: string;
 };
 
@@ -183,6 +186,11 @@ function formString(value: FormDataEntryValue | null) {
 function parsePercentage(value: string) {
   const parsed = Number(value.trim().replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseDecimal(value: string) {
+  const parsed = Number(value.trim().replace(',', '.'));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function localToday() {
@@ -375,6 +383,8 @@ export function InvestmentsPanel() {
       currentValueCents: parseCurrencyToCents(
         formString(form.get('currentValue')),
       ),
+      ticker: formString(form.get('ticker')).trim().toUpperCase(),
+      quantity: parseDecimal(formString(form.get('quantity'))),
       acquisitionDate: formString(form.get('acquisitionDate')),
     };
 
@@ -420,6 +430,8 @@ export function InvestmentsPanel() {
       currentValueCents: parseCurrencyToCents(
         formString(form.get('editCurrentValue')),
       ),
+      ticker: formString(form.get('editTicker')).trim().toUpperCase(),
+      quantity: parseDecimal(formString(form.get('editQuantity'))),
       acquisitionDate: formString(form.get('editAcquisitionDate')),
     };
 
@@ -488,6 +500,22 @@ export function InvestmentsPanel() {
   }
 
   const profitIsPositive = data.summary.profitCents >= 0;
+  const trackedAssets = useMemo(
+    () =>
+      data.investments.flatMap((investment) =>
+        investment.ticker && investment.quantity && investment.quantity > 0
+          ? [
+              {
+                id: investment.id,
+                name: investment.name,
+                ticker: investment.ticker,
+                quantity: investment.quantity,
+              },
+            ]
+          : [],
+      ),
+    [data.investments],
+  );
 
   return (
     <section className="min-h-[calc(100vh-81px)] pb-16">
@@ -719,6 +747,10 @@ export function InvestmentsPanel() {
         </div>
       </div>
 
+      <div className="mx-auto max-w-7xl px-5 pt-8 sm:px-8 lg:px-10">
+        <LiveMarketCard assets={trackedAssets} />
+      </div>
+
       <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
         <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
           <CardHeader className="border-b border-white/10 pb-4">
@@ -758,6 +790,40 @@ export function InvestmentsPanel() {
                   ))}
                 </NativeSelect>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="investment-ticker">
+                    Código B3{' '}
+                    <span className="text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="investment-ticker"
+                    name="ticker"
+                    autoCapitalize="characters"
+                    maxLength={12}
+                    placeholder="Ex.: PETR4"
+                    className="h-11 uppercase"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="investment-quantity">
+                    Quantidade{' '}
+                    <span className="text-muted-foreground">(opcional)</span>
+                  </Label>
+                  <Input
+                    id="investment-quantity"
+                    name="quantity"
+                    inputMode="decimal"
+                    placeholder="Ex.: 100"
+                    className="h-11"
+                  />
+                </div>
+              </div>
+              <p className="-mt-3 text-xs leading-relaxed text-muted-foreground">
+                Preencha os dois campos para ativar o gráfico de mercado. Não
+                use esses campos para CDB, Tesouro ou outros ativos sem ticker.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -971,6 +1037,13 @@ export function InvestmentsPanel() {
                               ),
                             )}
                           </p>
+                          {investment.ticker && investment.quantity ? (
+                            <p className="mt-1 text-xs font-medium text-white/75">
+                              {investment.ticker} ·{' '}
+                              {investment.quantity.toLocaleString('pt-BR')}{' '}
+                              unidades
+                            </p>
+                          ) : null}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <Badge
@@ -1078,6 +1151,31 @@ export function InvestmentsPanel() {
                     </NativeSelectOption>
                   ))}
                 </NativeSelect>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-investment-ticker">Código B3</Label>
+                  <Input
+                    id="edit-investment-ticker"
+                    name="editTicker"
+                    autoCapitalize="characters"
+                    maxLength={12}
+                    placeholder="Ex.: MXRF11"
+                    defaultValue={editingInvestment.ticker ?? ''}
+                    className="h-11 uppercase"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-investment-quantity">Quantidade</Label>
+                  <Input
+                    id="edit-investment-quantity"
+                    name="editQuantity"
+                    inputMode="decimal"
+                    placeholder="Ex.: 100"
+                    defaultValue={editingInvestment.quantity ?? ''}
+                    className="h-11"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
