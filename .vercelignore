@@ -1,0 +1,6 @@
+.git
+.next
+.npm-cache
+node_modules
+.env*
+!.env.example

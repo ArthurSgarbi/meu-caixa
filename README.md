@@ -10,12 +10,14 @@ flowchart LR
   C --> N[Next.js na Vercel]
   N --> P[(Neon PostgreSQL)]
   N --> O[OpenAI Responses API]
+  N --> B[brapi.dev / cotações B3]
 ```
 
 - **Next.js 16**: interface e rotas de API no mesmo projeto.
 - **Clerk**: cadastro, login e sessões seguras.
 - **Neon PostgreSQL**: histórico financeiro persistente.
 - **OpenAI API**: assistente que analisa apenas o contexto do usuário autenticado.
+- **brapi.dev**: cotações e gráfico intradiário dos ativos B3 cadastrados pelo usuário.
 
 ## Proteção dos dados
 
@@ -33,13 +35,16 @@ Segredos ficam somente em `.env.local` durante o desenvolvimento e nas variávei
 
 ## Variáveis de ambiente
 
-| Nome | Visibilidade | Uso |
-|---|---|---|
-| `DATABASE_URL` | Somente servidor | Conexão PostgreSQL do Neon |
-| `CLERK_SECRET_KEY` | Somente servidor | Validação de sessões |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Pública | Inicialização do Clerk no navegador |
-| `OPENAI_API_KEY` | Somente servidor | Assistente financeira |
-| `OPENAI_MODEL` | Somente servidor | Modelo usado pela assistente |
+| Nome                                | Visibilidade     | Uso                                                   |
+| ----------------------------------- | ---------------- | ----------------------------------------------------- |
+| `DATABASE_URL`                      | Somente servidor | Conexão PostgreSQL do Neon                            |
+| `CLERK_SECRET_KEY`                  | Somente servidor | Validação de sessões                                  |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Pública          | Inicialização do Clerk no navegador                   |
+| `OPENAI_API_KEY`                    | Somente servidor | Assistente financeira                                 |
+| `OPENAI_MODEL`                      | Somente servidor | Modelo usado pela assistente                          |
+| `BRAPI_TOKEN`                       | Somente servidor | Cotações B3; nunca deve usar o prefixo `NEXT_PUBLIC_` |
+
+O painel de mercado consulta a fonte apenas enquanto a área de investimentos está aberta. Durante o pregão, atualiza a cada minuto; fora dele, reduz a frequência de verificação. A recência da cotação depende do plano contratado na brapi.dev e deve ser conferida pelo horário exibido na tela.
 
 ## Comandos
 
