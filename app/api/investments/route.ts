@@ -16,8 +16,12 @@ type InvestmentInput = {
   assetClass: string;
   investedCents: number;
   currentValueCents: number;
+  ticker: string | null;
+  quantity: number | null;
   acquisitionDate: string;
 };
+
+const tickerPattern = /^[A-Z0-9]{4,12}$/;
 
 function parseInvestmentInput(
   body: Record<string, unknown>,
@@ -26,6 +30,11 @@ function parseInvestmentInput(
   const assetClass = typeof body.assetClass === 'string' ? body.assetClass : '';
   const investedCents = Number(body.investedCents);
   const currentValueCents = Number(body.currentValueCents);
+  const tickerValue =
+    typeof body.ticker === 'string' ? body.ticker.trim().toUpperCase() : '';
+  const quantityValue = Number(body.quantity);
+  const hasTicker = tickerValue.length > 0;
+  const hasQuantity = Number.isFinite(quantityValue) && quantityValue > 0;
   const acquisitionDate =
     typeof body.acquisitionDate === 'string' ? body.acquisitionDate : '';
 
@@ -41,6 +50,17 @@ function parseInvestmentInput(
   if (!Number.isSafeInteger(currentValueCents) || currentValueCents < 0) {
     return { error: 'Informe um valor atual válido.' };
   }
+  if (hasTicker !== hasQuantity) {
+    return {
+      error: 'Para acompanhar ao vivo, informe o código B3 e a quantidade.',
+    };
+  }
+  if (hasTicker && !tickerPattern.test(tickerValue)) {
+    return { error: 'Informe um código B3 válido, como PETR4 ou MXRF11.' };
+  }
+  if (hasQuantity && quantityValue > 1_000_000_000) {
+    return { error: 'Informe uma quantidade válida para o ativo.' };
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(acquisitionDate)) {
     return { error: 'Informe uma data de aquisição válida.' };
   }
@@ -51,6 +71,8 @@ function parseInvestmentInput(
       assetClass,
       investedCents,
       currentValueCents,
+      ticker: hasTicker ? tickerValue : null,
+      quantity: hasQuantity ? quantityValue : null,
       acquisitionDate,
     },
   };
@@ -74,6 +96,7 @@ export async function GET() {
             `SELECT id, name, asset_class AS assetClass,
                     invested_cents AS investedCents,
                     current_value_cents AS currentValueCents,
+                    ticker, quantity::double precision AS quantity,
                     acquisition_date AS acquisitionDate
                FROM investments
               WHERE owner_id = ?
@@ -97,7 +120,7 @@ export async function GET() {
                FROM investments
               WHERE owner_id = ?
               GROUP BY asset_class
-              ORDER BY currentValueCents DESC`,
+              ORDER BY SUM(current_value_cents) DESC`,
           )
           .bind(user.userId)
           .all(),
@@ -147,6 +170,8 @@ export async function POST(request: Request) {
       assetClass,
       investedCents,
       currentValueCents,
+      ticker,
+      quantity,
       acquisitionDate,
     } = parsed.input;
 
@@ -156,14 +181,16 @@ export async function POST(request: Request) {
       .prepare(
         `INSERT INTO investments
           (name, asset_class, invested_cents, current_value_cents,
-           acquisition_date, owner_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           ticker, quantity, acquisition_date, owner_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         name,
         assetClass,
         investedCents,
         currentValueCents,
+        ticker,
+        quantity,
         acquisitionDate,
         user.userId,
         now,
@@ -209,6 +236,8 @@ export async function PATCH(request: Request) {
       assetClass,
       investedCents,
       currentValueCents,
+      ticker,
+      quantity,
       acquisitionDate,
     } = parsed.input;
 
@@ -217,7 +246,8 @@ export async function PATCH(request: Request) {
       .prepare(
         `UPDATE investments
             SET name = ?, asset_class = ?, invested_cents = ?,
-                current_value_cents = ?, acquisition_date = ?, updated_at = ?
+                current_value_cents = ?, ticker = ?, quantity = ?,
+                acquisition_date = ?, updated_at = ?
           WHERE id = ? AND owner_id = ?`,
       )
       .bind(
@@ -225,6 +255,8 @@ export async function PATCH(request: Request) {
         assetClass,
         investedCents,
         currentValueCents,
+        ticker,
+        quantity,
         acquisitionDate,
         new Date().toISOString(),
         id,
