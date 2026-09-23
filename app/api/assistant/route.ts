@@ -22,7 +22,8 @@ type WorkersAIResponse = {
 const MAX_MESSAGE_LENGTH = 2_000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_MESSAGE_LENGTH = 1_000;
-const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
+// Modelo sem etapa de raciocínio separada: a API retorna o texto em result.response.
+const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
 function getMonthRange() {
   const month = new Date().toISOString().slice(0, 7);
@@ -273,7 +274,7 @@ export async function POST(request: Request) {
             ...history,
             { role: 'user', content: message },
           ],
-          max_completion_tokens: 700,
+          max_tokens: 512,
         }),
         signal: AbortSignal.timeout(30_000),
       },
