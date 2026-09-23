@@ -251,6 +251,10 @@ export function AssistantPanel() {
                 Enter envia · Shift + Enter quebra a linha · Planejamento
                 educativo, não recomendação de investimento.
               </p>
+              <p className="mt-1 text-[11px] text-white/45">
+                Ao perguntar, os dados financeiros relevantes são processados
+                pelo Cloudflare Workers AI para gerar a resposta.
+              </p>
             </form>
           </CardContent>
         </Card>
