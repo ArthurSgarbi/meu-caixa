@@ -11,18 +11,18 @@ type ChatMessage = {
   content: string;
 };
 
-type OpenAIResponse = {
-  output_text?: string;
-  output?: Array<{
-    type?: string;
-    content?: Array<{ type?: string; text?: string }>;
-  }>;
-  error?: { message?: string };
+type WorkersAIResponse = {
+  success?: boolean;
+  result?: {
+    response?: string;
+    choices?: Array<{ message?: { content?: string } }>;
+  };
 };
 
 const MAX_MESSAGE_LENGTH = 2_000;
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_MESSAGE_LENGTH = 1_000;
+const WORKERS_AI_MODEL = '@cf/zai-org/glm-4.7-flash';
 
 function getMonthRange() {
   const month = new Date().toISOString().slice(0, 7);
@@ -50,25 +50,13 @@ function parseHistory(value: unknown): ChatMessage[] {
   });
 }
 
-async function hashSafetyIdentifier(userId: string) {
-  const bytes = new TextEncoder().encode(userId);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('');
-}
-
-function extractOutputText(response: OpenAIResponse) {
-  if (typeof response.output_text === 'string' && response.output_text.trim()) {
-    return response.output_text.trim();
-  }
-
-  return (response.output ?? [])
-    .flatMap((item) => item.content ?? [])
-    .filter((item) => item.type === 'output_text' && item.text)
-    .map((item) => item.text)
-    .join('\n')
-    .trim();
+function extractOutputText(response: WorkersAIResponse) {
+  const result = response.result;
+  return (
+    result?.response ??
+    result?.choices?.[0]?.message?.content ??
+    ''
+  ).trim();
 }
 
 async function loadFinancialContext(db: Database, ownerId: string) {
@@ -254,12 +242,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+    const apiToken = process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
+    if (!accountId || !apiToken) {
       return Response.json(
         {
           error:
-            'A assistente está pronta, mas falta configurar OPENAI_API_KEY no ambiente do servidor.',
+            'A assistente está aguardando a configuração segura do Cloudflare Workers AI no servidor.',
         },
         { status: 503 },
       );
@@ -267,33 +256,42 @@ export async function POST(request: Request) {
 
     const history = parseHistory(body.history);
     const financialContext = await loadFinancialContext(getDb(), user.userId);
-    const safetyIdentifier = await hashSafetyIdentifier(user.userId);
-
-    const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+    const providerResponse = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/ai/run/${WORKERS_AI_MODEL}`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `${ASSISTANT_SYSTEM_PROMPT}\n\n<contexto_financeiro>\n${JSON.stringify(financialContext)}\n</contexto_financeiro>`,
+            },
+            ...history,
+            { role: 'user', content: message },
+          ],
+          max_completion_tokens: 700,
+        }),
+        signal: AbortSignal.timeout(30_000),
       },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-5.4-mini',
-        instructions: `${ASSISTANT_SYSTEM_PROMPT}\n\n<contexto_financeiro>\n${JSON.stringify(financialContext)}\n</contexto_financeiro>`,
-        input: [...history, { role: 'user', content: message }],
-        max_output_tokens: 700,
-        store: false,
-        safety_identifier: safetyIdentifier,
-      }),
-    });
+    );
 
-    const responseBody = (await openAIResponse.json()) as OpenAIResponse;
-    if (!openAIResponse.ok) {
-      console.error('OpenAI response failed', {
-        status: openAIResponse.status,
-        message: responseBody.error?.message,
+    const responseBody = (await providerResponse.json()) as WorkersAIResponse;
+    if (!providerResponse.ok || responseBody.success === false) {
+      console.error('Workers AI response failed', {
+        status: providerResponse.status,
       });
       return Response.json(
-        { error: 'A IA não conseguiu responder agora. Tente novamente.' },
-        { status: 502 },
+        {
+          error:
+            providerResponse.status === 429
+              ? 'A cota gratuita da IA foi atingida. Tente novamente mais tarde.'
+              : 'A IA não conseguiu responder agora. Tente novamente.',
+        },
+        { status: providerResponse.status === 429 ? 429 : 502 },
       );
     }
 
