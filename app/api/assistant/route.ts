@@ -88,8 +88,8 @@ async function loadFinancialContext(db: Database, ownerId: string) {
     db
       .prepare(
         `SELECT
-           COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS incomeCents,
-           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expenseCents
+           COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS "incomeCents",
+           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS "expenseCents"
          FROM transactions
          WHERE owner_id = ?
            AND transaction_date >= ? AND transaction_date < ?`,
@@ -100,28 +100,28 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       .prepare(
         `SELECT COALESCE(
            SUM(CASE WHEN type = 'income' THEN amount_cents ELSE -amount_cents END), 0
-         ) AS balanceCents
+         ) AS "balanceCents"
          FROM transactions WHERE owner_id = ?`,
       )
       .bind(ownerId)
       .first(),
     db
       .prepare(
-        `SELECT c.name AS category, SUM(t.amount_cents) AS totalCents
+        `SELECT c.name AS category, SUM(t.amount_cents) AS "totalCents"
          FROM transactions t
          JOIN categories c ON c.id = t.category_id
          WHERE t.owner_id = ? AND t.type = 'expense'
            AND t.transaction_date >= ? AND t.transaction_date < ?
          GROUP BY c.id, c.name
-         ORDER BY totalCents DESC
+         ORDER BY "totalCents" DESC
          LIMIT 5`,
       )
       .bind(ownerId, start, next)
       .all(),
     db
       .prepare(
-        `SELECT t.description, t.type, t.amount_cents AS amountCents,
-                t.transaction_date AS transactionDate, c.name AS category
+        `SELECT t.description, t.type, t.amount_cents AS "amountCents",
+                t.transaction_date AS "transactionDate", c.name AS category
          FROM transactions t
          JOIN categories c ON c.id = t.category_id
          WHERE t.owner_id = ?
@@ -132,16 +132,16 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       .all(),
     db
       .prepare(
-        `SELECT c.name, c.credit_limit_cents AS limitTotalCents,
-                c.closing_day AS closingDay, c.due_day AS dueDay,
+        `SELECT c.name, c.credit_limit_cents AS "limitTotalCents",
+                c.closing_day AS "closingDay", c.due_day AS "dueDay",
                 COALESCE(SUM(CASE WHEN i.status != 'paid'
-                  THEN t.amount_cents ELSE 0 END), 0) AS outstandingCents,
+                  THEN t.amount_cents ELSE 0 END), 0) AS "outstandingCents",
                 COALESCE(SUM(CASE WHEN i.status != 'paid'
                   AND i.reference_month = ? THEN t.amount_cents ELSE 0 END), 0)
-                  AS currentInvoiceCents,
+                  AS "currentInvoiceCents",
                 COALESCE(SUM(CASE WHEN i.status != 'paid'
                   AND i.reference_month > ? THEN t.amount_cents ELSE 0 END), 0)
-                  AS futureInstallmentsCents
+                  AS "futureInstallmentsCents"
          FROM credit_cards c
          LEFT JOIN credit_card_invoices i
            ON i.card_id = c.id AND i.owner_id = c.owner_id
@@ -155,18 +155,18 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       .all(),
     db
       .prepare(
-        `SELECT balance_cents AS balanceCents,
-                annual_cdi_rate_bps AS annualCdiRateBps,
-                cdb_percentage_bps AS cdbPercentageBps
+        `SELECT balance_cents AS "balanceCents",
+                annual_cdi_rate_bps AS "annualCdiRateBps",
+                cdb_percentage_bps AS "cdbPercentageBps"
          FROM investment_wallets WHERE owner_id = ?`,
       )
       .bind(ownerId)
       .first(),
     db
       .prepare(
-        `SELECT COALESCE(SUM(invested_cents), 0) AS investedCents,
-                COALESCE(SUM(current_value_cents), 0) AS currentValueCents,
-                COUNT(*) AS assetCount
+        `SELECT COALESCE(SUM(invested_cents), 0) AS "investedCents",
+                COALESCE(SUM(current_value_cents), 0) AS "currentValueCents",
+                COUNT(*) AS "assetCount"
          FROM investments WHERE owner_id = ?`,
       )
       .bind(ownerId)
