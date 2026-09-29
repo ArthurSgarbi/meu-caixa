@@ -33,7 +33,7 @@ Segredos ficam somente em `.env.local` durante o desenvolvimento e nas variávei
 
 ## Executar localmente
 
-1. Instale o Node.js 22 ou superior.
+1. Instale o Node.js 22.15 ou superior.
 2. Execute `npm install`.
 3. Copie `.env.example` para `.env.local` e configure as variáveis.
 4. Execute `npm run db:migrate` para preparar o banco.
@@ -46,8 +46,8 @@ Segredos ficam somente em `.env.local` durante o desenvolvimento e nas variávei
 | `DATABASE_URL`                      | Somente servidor | Conexão PostgreSQL do Neon                            |
 | `CLERK_SECRET_KEY`                  | Somente servidor | Validação de sessões                                  |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Pública          | Inicialização do Clerk no navegador                   |
-| `CLOUDFLARE_ACCOUNT_ID`            | Somente servidor | Conta Cloudflare para Workers AI                      |
-| `CLOUDFLARE_WORKERS_AI_TOKEN`       | Somente servidor | Token restrito ao Workers AI                           |
+| `CLOUDFLARE_ACCOUNT_ID`             | Somente servidor | Conta Cloudflare para Workers AI                      |
+| `CLOUDFLARE_WORKERS_AI_TOKEN`       | Somente servidor | Token restrito ao Workers AI                          |
 | `BRAPI_TOKEN`                       | Somente servidor | Cotações B3; nunca deve usar o prefixo `NEXT_PUBLIC_` |
 
 O painel de mercado consulta a fonte apenas enquanto a área de investimentos está aberta. Durante o pregão, atualiza a cada minuto; fora dele, reduz a frequência de verificação. A recência da cotação depende do plano contratado na brapi.dev e deve ser conferida pelo horário exibido na tela.
@@ -61,6 +61,8 @@ Para ativar a assistente, crie um token restrito ao Workers AI no painel da Clou
 - `npm run db:generate`: gera migrações após alterações no schema.
 - `npm run db:migrate`: aplica migrações pendentes com segurança.
 - `npm run lint`: executa a análise estática.
-- `npm test`: verifica as regras de saldo, orçamento e intervalo mensal.
+- `npm test`: verifica cálculos e isolamento entre contas em um PostgreSQL temporário em memória.
+
+Os testes de segurança simulam duas identidades autenticadas e exercitam as rotas reais de transações, orçamentos, cartões, investimentos, recorrências, simulações, backup e o contexto enviado à IA. Não utilizam o banco Neon nem chamam o provedor de IA. O GitHub Actions executa os testes e a checagem de tipos em cada pull request e push para `main`. Isso valida as regras da aplicação, mas não substitui um teste de login real no Clerk nem uma auditoria de segurança em produção.
 
 O comando `vercel-build` aplica somente migrações ainda pendentes e depois compila o aplicativo.

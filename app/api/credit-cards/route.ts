@@ -334,6 +334,12 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    if (installmentCount > totalAmountCents) {
+      return Response.json(
+        { error: 'Cada parcela deve ter valor de pelo menos R$ 0,01.' },
+        { status: 400 },
+      );
+    }
 
     const card = await db
       .prepare(
