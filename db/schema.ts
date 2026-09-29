@@ -35,6 +35,13 @@ export const transactions = pgTable(
       .notNull()
       .references(() => categories.id),
     ownerId: text('owner_id').notNull().default(''),
+    recurringRuleId: integer('recurring_rule_id').references(
+      () => recurringRules.id,
+      {
+        onDelete: 'set null',
+      },
+    ),
+    recurringOccurrenceDate: text('recurring_occurrence_date'),
     createdAt: text('created_at').notNull(),
   },
   (table) => [
@@ -47,7 +54,32 @@ export const transactions = pgTable(
       table.categoryId,
       table.transactionDate,
     ),
+    uniqueIndex('idx_transactions_recurring_occurrence').on(
+      table.ownerId,
+      table.recurringRuleId,
+      table.recurringOccurrenceDate,
+    ),
   ],
+);
+
+export const recurringRules = pgTable(
+  'recurring_rules',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    description: text('description').notNull(),
+    type: text('type', { enum: ['income', 'expense'] }).notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => categories.id),
+    startsOn: text('starts_on').notNull(),
+    endsOn: text('ends_on'),
+    active: integer('active').notNull().default(1),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('idx_recurring_rules_owner').on(table.ownerId)],
 );
 
 export const budgets = pgTable(

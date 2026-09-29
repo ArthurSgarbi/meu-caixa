@@ -62,7 +62,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
+import { DataToolsPanel } from './data-tools-panel';
 import { InvestmentsPanel } from './investments-panel';
+import { RecurringPanel } from './recurring-panel';
 import { SimulationsPanel } from './simulations-panel';
 
 type TransactionType = 'income' | 'expense';
@@ -1016,6 +1018,22 @@ export default function Home() {
             key={month}
             month={month}
             refreshKey={budgetRefreshKey}
+          />
+
+          <RecurringPanel
+            key={`recurring-${month}`}
+            month={month}
+            categories={data.categories}
+            refreshKey={budgetRefreshKey}
+            onConfirmed={async () => {
+              await loadData(month);
+            }}
+          />
+
+          <DataToolsPanel
+            onRestored={async () => {
+              await loadData(month);
+            }}
           />
 
           <Dialog

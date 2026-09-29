@@ -4,6 +4,10 @@ Aplicação web de controle financeiro pessoal com receitas e despesas, cartões
 
 Na área de Gastos, aportes são transferências da conta para a carteira: reduzem o saldo disponível, mas não são somados às despesas. Os orçamentos mensais por categoria comparam apenas despesas de consumo ao limite definido pelo usuário.
 
+Recorrências mensais aparecem como **previsões** e não alteram o saldo até a confirmação explícita de cada ocorrência. A projeção de seis meses combina o saldo confirmado de hoje, ocorrências pendentes e lançamentos futuros já registrados.
+
+Em **Seus dados e backup**, o usuário pode baixar as transações em CSV ou um JSON com todas as áreas financeiras e verificar/restaurar registros ausentes na mesma conta. Veja [o procedimento e as limitações](docs/backup-recovery.md).
+
 ## Arquitetura
 
 ```mermaid

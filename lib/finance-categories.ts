@@ -8,6 +8,7 @@ export const categorySeeds = [
   ['saude', 'Saúde', 'expense'],
   ['educacao', 'Educação', 'expense'],
   ['outros-gastos', 'Outros gastos', 'expense'],
+  ['investimentos', 'Investimentos', 'expense'],
   ['salario', 'Salário', 'income'],
   ['freelance', 'Freelance', 'income'],
   ['rendimentos', 'Rendimentos', 'income'],
