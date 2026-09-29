@@ -195,7 +195,7 @@ export async function POST(request: Request) {
           `INSERT INTO transactions
             (description, type, amount_cents, transaction_date, category_id,
              owner_id, created_at)
-           VALUES (?, 'expense', ?, ?, ?, ?, ?)`,
+           VALUES (?, 'transfer', ?, ?, ?, ?, ?)`,
         )
         .bind(
           `Investimento: ${description}`,

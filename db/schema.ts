@@ -28,7 +28,7 @@ export const transactions = pgTable(
   {
     id: serial('id').primaryKey(),
     description: text('description').notNull(),
-    type: text('type', { enum: ['income', 'expense'] }).notNull(),
+    type: text('type', { enum: ['income', 'expense', 'transfer'] }).notNull(),
     amountCents: integer('amount_cents').notNull(),
     transactionDate: text('transaction_date').notNull(),
     categoryId: integer('category_id')

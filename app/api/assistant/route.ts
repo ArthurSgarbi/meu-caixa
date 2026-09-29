@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb, type Database } from '@/db';
+import { calculateMonthlyAccountChangeCents } from '@/lib/finance-calculations';
 import { ASSISTANT_SYSTEM_PROMPT } from '@/lib/assistant-system-prompt';
 
 export const dynamic = 'force-dynamic';
@@ -69,6 +70,7 @@ async function loadFinancialContext(db: Database, ownerId: string) {
     monthlySummary,
     accountBalance,
     topCategories,
+    budgetsResult,
     recentTransactions,
     cardsResult,
     wallet,
@@ -78,7 +80,8 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       .prepare(
         `SELECT
            COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS "incomeCents",
-           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS "expenseCents"
+           COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS "expenseCents",
+           COALESCE(SUM(CASE WHEN type = 'transfer' THEN amount_cents ELSE 0 END), 0) AS "transferCents"
          FROM transactions
          WHERE owner_id = ?
            AND transaction_date >= ? AND transaction_date < ?`,
@@ -106,6 +109,21 @@ async function loadFinancialContext(db: Database, ownerId: string) {
          LIMIT 5`,
       )
       .bind(ownerId, start, next)
+      .all(),
+    db
+      .prepare(
+        `SELECT c.name AS category, b.limit_cents AS "limitCents",
+                COALESCE(SUM(t.amount_cents), 0) AS "spentCents"
+           FROM budgets b
+           JOIN categories c ON c.id = b.category_id
+           LEFT JOIN transactions t ON t.category_id = b.category_id
+             AND t.owner_id = b.owner_id AND t.type = 'expense'
+             AND t.transaction_date >= ? AND t.transaction_date < ?
+          WHERE b.owner_id = ? AND b.month = ?
+          GROUP BY b.id, c.name, b.limit_cents
+          ORDER BY c.name`,
+      )
+      .bind(start, next, ownerId, month)
       .all(),
     db
       .prepare(
@@ -164,6 +182,7 @@ async function loadFinancialContext(db: Database, ownerId: string) {
 
   const incomeCents = Number(monthlySummary?.incomeCents ?? 0);
   const expenseCents = Number(monthlySummary?.expenseCents ?? 0);
+  const transferCents = Number(monthlySummary?.transferCents ?? 0);
   const cards = cardsResult.results.map((card) => {
     const limitTotalCents = Number(card.limitTotalCents ?? 0);
     const outstandingCents = Number(card.outstandingCents ?? 0);
@@ -185,10 +204,21 @@ async function loadFinancialContext(db: Database, ownerId: string) {
     monthlySummary: {
       incomeCents,
       expenseCents,
-      balanceCents: incomeCents - expenseCents,
+      transferCents,
+      balanceCents: calculateMonthlyAccountChangeCents(
+        incomeCents,
+        expenseCents,
+        transferCents,
+      ),
     },
     mainAccountBalanceCents: Number(accountBalance?.balanceCents ?? 0),
     topExpenseCategories: topCategories.results,
+    monthlyBudgets: budgetsResult.results.map((budget) => ({
+      category: String(budget.category),
+      limitCents: Number(budget.limitCents),
+      spentCents: Number(budget.spentCents),
+      remainingCents: Number(budget.limitCents) - Number(budget.spentCents),
+    })),
     recentTransactions: recentTransactions.results,
     creditCards: cards,
     creditCardTotals: cards.reduce(

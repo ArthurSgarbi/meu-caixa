@@ -15,6 +15,13 @@
       "when": 1789602662204,
       "tag": "0001_free_ronan",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790207538334,
+      "tag": "0002_reclassificar_aportes",
+      "breakpoints": true
     }
   ]
 }

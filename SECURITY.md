@@ -12,7 +12,7 @@ Não publique vulnerabilidades em uma issue pública. Envie o relato diretamente
 - consultas parametrizadas contra injeção de SQL;
 - segredos fora do Git e das respostas do navegador;
 - cabeçalhos de proteção para conteúdo, enquadramento e permissões;
-- chave da OpenAI acessível somente nas rotas do servidor;
+- token do Cloudflare Workers AI acessível somente nas rotas do servidor;
 - histórico de migrações versionado e auditável.
 
 ## Segredos comprometidos

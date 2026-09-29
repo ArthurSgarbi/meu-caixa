@@ -1,21 +1,10 @@
 import { getDb, type Database } from '@/db';
 import { getChatGPTUser } from '@/app/chatgpt-auth';
+import { seedCategories } from '@/lib/finance-categories';
+import { calculateMonthlyAccountChangeCents } from '@/lib/finance-calculations';
+import { getMonthRange } from '@/lib/finance-month';
 
 export const dynamic = 'force-dynamic';
-
-const categorySeeds = [
-  ['alimentacao', 'Alimentação', 'expense'],
-  ['moradia', 'Moradia', 'expense'],
-  ['transporte', 'Transporte', 'expense'],
-  ['lazer', 'Lazer', 'expense'],
-  ['saude', 'Saúde', 'expense'],
-  ['educacao', 'Educação', 'expense'],
-  ['outros-gastos', 'Outros gastos', 'expense'],
-  ['salario', 'Salário', 'income'],
-  ['freelance', 'Freelance', 'income'],
-  ['rendimentos', 'Rendimentos', 'income'],
-  ['outras-receitas', 'Outras receitas', 'income'],
-] as const;
 
 type TransactionType = 'income' | 'expense';
 
@@ -65,32 +54,11 @@ async function categoryMatchesType(
   type: TransactionType,
 ) {
   return db
-    .prepare('SELECT id FROM categories WHERE id = ? AND type = ?')
+    .prepare(
+      "SELECT id FROM categories WHERE id = ? AND type = ? AND slug <> 'investimentos'",
+    )
     .bind(categoryId, type)
     .first();
-}
-
-function getMonthRange(month: string) {
-  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return null;
-  const [year, monthNumber] = month.split('-').map(Number);
-  const start = `${month}-01`;
-  const next = new Date(Date.UTC(year, monthNumber, 1))
-    .toISOString()
-    .slice(0, 10);
-  return { start, next };
-}
-
-async function seedCategories(db: Database) {
-  const now = new Date().toISOString();
-  await db.batch(
-    categorySeeds.map(([slug, name, type]) =>
-      db
-        .prepare(
-          'INSERT OR IGNORE INTO categories (slug, name, type, created_at) VALUES (?, ?, ?, ?)',
-        )
-        .bind(slug, name, type, now),
-    ),
-  );
 }
 
 export async function GET(request: Request) {
@@ -136,7 +104,8 @@ export async function GET(request: Request) {
           .prepare(
             `SELECT
              COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE 0 END), 0) AS incomeCents,
-             COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expenseCents
+             COALESCE(SUM(CASE WHEN type = 'expense' THEN amount_cents ELSE 0 END), 0) AS expenseCents,
+             COALESCE(SUM(CASE WHEN type = 'transfer' THEN amount_cents ELSE 0 END), 0) AS transferCents
            FROM transactions
            WHERE owner_id = ?
              AND transaction_date >= ? AND transaction_date < ?`,
@@ -144,12 +113,15 @@ export async function GET(request: Request) {
           .bind(user.userId, range.start, range.next)
           .first(),
         db
-          .prepare('SELECT id, name, type FROM categories ORDER BY type, name')
+          .prepare(
+            "SELECT id, name, type FROM categories WHERE slug <> 'investimentos' ORDER BY type, name",
+          )
           .all(),
       ]);
 
     const incomeCents = Number(summaryResult?.incomeCents ?? 0);
     const expenseCents = Number(summaryResult?.expenseCents ?? 0);
+    const transferCents = Number(summaryResult?.transferCents ?? 0);
 
     return Response.json({
       transactions: transactionsResult.results,
@@ -157,7 +129,12 @@ export async function GET(request: Request) {
       summary: {
         incomeCents,
         expenseCents,
-        balanceCents: incomeCents - expenseCents,
+        transferCents,
+        balanceCents: calculateMonthlyAccountChangeCents(
+          incomeCents,
+          expenseCents,
+          transferCents,
+        ),
       },
     });
   } catch (error) {
@@ -267,7 +244,7 @@ export async function PATCH(request: Request) {
         `UPDATE transactions
             SET description = ?, type = ?, amount_cents = ?,
                 transaction_date = ?, category_id = ?
-          WHERE id = ? AND owner_id = ?`,
+          WHERE id = ? AND owner_id = ? AND type IN ('income', 'expense')`,
       )
       .bind(
         description,

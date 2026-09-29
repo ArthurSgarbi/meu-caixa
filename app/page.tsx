@@ -29,6 +29,7 @@ import {
   Plus,
   ReceiptText,
   ShieldCheck,
+  Target,
   UserPlus,
   WalletCards,
 } from 'lucide-react';
@@ -59,6 +60,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AssistantPanel } from './assistant-panel';
+import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
 import { InvestmentsPanel } from './investments-panel';
 import { SimulationsPanel } from './simulations-panel';
@@ -74,7 +76,7 @@ type Category = {
 type Transaction = {
   id: number;
   description: string;
-  type: TransactionType;
+  type: TransactionType | 'transfer';
   amountCents: number;
   transactionDate: string;
   categoryId: number;
@@ -87,6 +89,7 @@ type FinanceData = {
   summary: {
     incomeCents: number;
     expenseCents: number;
+    transferCents: number;
     balanceCents: number;
   };
 };
@@ -138,7 +141,12 @@ declare global {
 const emptyData: FinanceData = {
   transactions: [],
   categories: [],
-  summary: { incomeCents: 0, expenseCents: 0, balanceCents: 0 },
+  summary: {
+    incomeCents: 0,
+    expenseCents: 0,
+    transferCents: 0,
+    balanceCents: 0,
+  },
 };
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -244,6 +252,7 @@ export default function Home() {
   const [sessionError, setSessionError] = useState('');
   const [month, setMonth] = useState(currentMonth);
   const [data, setData] = useState<FinanceData>(emptyData);
+  const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -313,6 +322,7 @@ export default function Home() {
         if (!response.ok)
           throw new Error(result.error ?? 'Não foi possível carregar o mês.');
         setData(result);
+        setBudgetRefreshKey((value) => value + 1);
       } catch (requestError) {
         if (
           requestError instanceof DOMException &&
@@ -527,6 +537,7 @@ export default function Home() {
   }
 
   function openTransactionEditor(transaction: Transaction) {
+    if (transaction.type === 'transfer') return;
     setEditingTransaction(transaction);
     setEditType(transaction.type);
     setEditCategoryId(String(transaction.categoryId));
@@ -690,6 +701,20 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <Button
                     type="button"
+                    aria-label="Ver orçamentos do mês"
+                    title="Ver orçamentos do mês"
+                    onClick={() =>
+                      document
+                        .getElementById('monthly-budgets')
+                        ?.scrollIntoView({ behavior: 'smooth' })
+                    }
+                    className="border border-white/15 bg-[#292d35]/80 text-white hover:bg-[#343943]"
+                  >
+                    <Target />
+                    <span className="hidden md:inline">Orçamentos</span>
+                  </Button>
+                  <Button
+                    type="button"
                     onClick={() => void openInvestmentTransfer()}
                     className="mr-1 bg-white font-semibold text-black hover:bg-white/85"
                   >
@@ -717,7 +742,7 @@ export default function Home() {
               </div>
 
               <section
-                className="grid gap-3 md:grid-cols-3"
+                className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
                 aria-label="Resumo mensal"
               >
                 <SummaryCard
@@ -735,7 +760,14 @@ export default function Home() {
                   loading={loading}
                 />
                 <SummaryCard
-                  label="Saldo do mês"
+                  label="Transferido para investimentos"
+                  value={formatCurrency(data.summary.transferCents)}
+                  icon={<PiggyBank />}
+                  tone="balance"
+                  loading={loading}
+                />
+                <SummaryCard
+                  label="Saldo do mês após aportes"
                   value={formatCurrency(data.summary.balanceCents)}
                   icon={<WalletCards />}
                   tone="balance"
@@ -947,23 +979,29 @@ export default function Home() {
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary">
-                              {transaction.categoryName}
+                              {transaction.type === 'transfer'
+                                ? 'Transferência · Investimentos'
+                                : transaction.categoryName}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right font-semibold text-white tabular-nums">
-                            {transaction.type === 'expense' ? '− ' : '+ '}
+                            {transaction.type === 'income' ? '+ ' : '− '}
                             {formatCurrency(transaction.amountCents)}
                           </TableCell>
                           <TableCell className="pr-5 text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Editar ${transaction.description}`}
-                              onClick={() => openTransactionEditor(transaction)}
-                            >
-                              <Pencil />
-                            </Button>
+                            {transaction.type !== 'transfer' && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Editar ${transaction.description}`}
+                                onClick={() =>
+                                  openTransactionEditor(transaction)
+                                }
+                              >
+                                <Pencil />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -973,6 +1011,12 @@ export default function Home() {
               </CardContent>
             </Card>
           </div>
+
+          <BudgetsPanel
+            key={month}
+            month={month}
+            refreshKey={budgetRefreshKey}
+          />
 
           <Dialog
             open={investmentTransferOpen}

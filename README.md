@@ -2,6 +2,8 @@
 
 Aplicação web de controle financeiro pessoal com receitas e despesas, cartões de crédito, investimentos, simulações e uma assistente financeira com IA.
 
+Na área de Gastos, aportes são transferências da conta para a carteira: reduzem o saldo disponível, mas não são somados às despesas. Os orçamentos mensais por categoria comparam apenas despesas de consumo ao limite definido pelo usuário.
+
 ## Arquitetura
 
 ```mermaid
@@ -55,5 +57,6 @@ Para ativar a assistente, crie um token restrito ao Workers AI no painel da Clou
 - `npm run db:generate`: gera migrações após alterações no schema.
 - `npm run db:migrate`: aplica migrações pendentes com segurança.
 - `npm run lint`: executa a análise estática.
+- `npm test`: verifica as regras de saldo, orçamento e intervalo mensal.
 
 O comando `vercel-build` aplica somente migrações ainda pendentes e depois compila o aplicativo.
