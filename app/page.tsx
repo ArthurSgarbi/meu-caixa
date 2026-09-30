@@ -657,7 +657,7 @@ export default function Home() {
         <nav className="border-b border-foreground/15 text-foreground">
           <div className="mx-auto flex max-w-7xl min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-inverse text-inverse-foreground shadow-[0_8px_24px_rgba(255,255,255,.2)]">
+              <span className="grid size-10 place-items-center rounded-xl bg-inverse text-inverse-foreground">
                 <CircleDollarSign className="size-5" aria-hidden="true" />
               </span>
               <div>
@@ -1410,7 +1410,7 @@ function AuthScreen({
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
         <section>
           <div className="mb-9 flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-xl bg-inverse text-inverse-foreground shadow-[0_8px_24px_rgba(255,255,255,.2)]">
+            <span className="grid size-11 place-items-center rounded-xl bg-inverse text-inverse-foreground">
               <CircleDollarSign className="size-6" aria-hidden="true" />
             </span>
             <div>

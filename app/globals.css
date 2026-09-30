@@ -105,7 +105,6 @@ body {
   overflow-wrap: anywhere;
   background-color: var(--background);
   background-image:
-    radial-gradient(circle at 4% 2%, rgb(210 181 137 / 18%), transparent 34%),
     radial-gradient(circle at 96% 95%, var(--brand-glow), transparent 38%),
     linear-gradient(
       125deg,
