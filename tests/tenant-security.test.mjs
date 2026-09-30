@@ -55,7 +55,10 @@ const recurringConfirmRoute =
 const simulationsRoute = await import('../app/api/simulations/route.ts');
 const assistantRoute = await import('../app/api/assistant/route.ts');
 const preferencesRoute = await import('../app/api/preferences/route.ts');
+const overviewRoute = await import('../app/api/overview/route.ts');
+const searchRoute = await import('../app/api/transactions/search/route.ts');
 const { defaultPreferences } = await import('../lib/user-preferences.ts');
+const { todayInBrazil } = await import('../lib/finance-month.ts');
 
 function normalizeSql(query) {
   let parameterIndex = 0;
@@ -145,6 +148,169 @@ test('handler returns 401 without authentication', async () => {
     new Request('https://local.test/api/transactions?month=2026-09'),
   );
   assert.equal(response.status, 401);
+  assert.equal((await overviewRoute.GET()).status, 401);
+  assert.equal(
+    (
+      await searchRoute.GET(
+        new Request('https://local.test/api/transactions/search'),
+      )
+    ).status,
+    401,
+  );
+});
+
+test('overview isolates accounts, omits paid invoices and does not book unconfirmed recurrences', async () => {
+  const categories = await categoryIds();
+  currentOwner = 'test-owner-a';
+  const today = todayInBrazil();
+  const month = today.slice(0, 7);
+  const date = `${month}-01`;
+  for (const [type, amount, category] of [
+    ['income', 100000, 'Salário'],
+    ['expense', 8500, 'Lazer'],
+  ]) {
+    await transactionsRoute.POST(
+      jsonRequest('/api/transactions', 'POST', {
+        description: 'Registro privado A',
+        type,
+        amountCents: amount,
+        transactionDate: date,
+        categoryId: categories[category],
+      }),
+    );
+  }
+  await transactionsRoute.POST(
+    jsonRequest('/api/transactions', 'POST', {
+      description: 'Receita futura A',
+      type: 'income',
+      amountCents: 500000,
+      transactionDate: '2099-01-01',
+      categoryId: categories['Salário'],
+    }),
+  );
+  await budgetsRoute.PUT(
+    jsonRequest('/api/budgets', 'PUT', {
+      month,
+      categoryId: categories['Lazer'],
+      limitCents: 10000,
+    }),
+  );
+  await recurringRoute.POST(
+    jsonRequest('/api/recurring', 'POST', {
+      description: 'Recorrência privada A',
+      type: 'expense',
+      amountCents: 123,
+      startsOn: date,
+      categoryId: categories['Lazer'],
+    }),
+  );
+  await pg.exec(`INSERT INTO investment_wallets (owner_id, balance_cents, created_at, updated_at) VALUES ('test-owner-a', 111, 'now', 'now');
+    INSERT INTO investments (owner_id, name, asset_class, invested_cents, current_value_cents, acquisition_date, created_at, updated_at) VALUES ('test-owner-a', 'Carteira A', 'Ações', 100, 222, '${date}', 'now', 'now');
+    INSERT INTO credit_cards (owner_id, name, brand, last_four, credit_limit_cents, closing_day, due_day, created_at, updated_at) VALUES ('test-owner-a', 'Inter A', 'Visa', '1234', 100000, 1, 2, 'now', 'now')`);
+  const cardId = (await pg.query('SELECT id FROM credit_cards')).rows[0].id;
+  await pg.exec(`INSERT INTO credit_card_invoices (card_id, owner_id, reference_month, closing_date, due_date, status, created_at, updated_at)
+    VALUES (${cardId}, 'test-owner-a', '${month}', '${date}', '${today}', 'open', 'now', 'now'),
+      (${cardId}, 'test-owner-a', '2099-01', '2099-01-01', '${today}', 'paid', 'now', 'now')`);
+  for (const invoice of (await pg.query('SELECT id FROM credit_card_invoices'))
+    .rows) {
+    await pg.exec(`INSERT INTO credit_card_transactions (card_id, invoice_id, owner_id, purchase_group_id, description, amount_cents, purchase_date, created_at)
+      VALUES (${cardId}, ${invoice.id}, 'test-owner-a', 'a-${invoice.id}', 'Compra privada', 500, '${date}', 'now')`);
+  }
+  const response = await overviewRoute.GET();
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const data = await response.json();
+  assert.equal(data.accountBalanceCents, 91500);
+  assert.equal(data.walletBalanceCents, 111);
+  assert.equal(data.portfolioValueCents, 222);
+  assert.equal(data.invoices.length, 1);
+  assert.ok(data.alerts.some((alert) => alert.kind === 'budget'));
+  assert.ok(data.alerts.some((alert) => alert.kind === 'invoice'));
+  assert.ok(data.alerts.some((alert) => alert.kind === 'recurring'));
+  const ruleId = (await pg.query('SELECT id FROM recurring_rules')).rows[0].id;
+  const confirmed = await recurringConfirmRoute.POST(
+    jsonRequest('/api/recurring/confirm', 'POST', {
+      ruleId,
+      date,
+    }),
+  );
+  assert.equal(confirmed.status, 201);
+  const afterConfirmation = await (await overviewRoute.GET()).json();
+  assert.equal(afterConfirmation.accountBalanceCents, 91377);
+  assert.ok(
+    !afterConfirmation.occurrences.some(
+      (item) => item.id === ruleId && item.date === date,
+    ),
+  );
+  assert.ok(
+    !afterConfirmation.alerts.some(
+      (alert) => alert.id === `recurring:${ruleId}:${date}`,
+    ),
+  );
+  currentOwner = 'test-owner-b';
+  const other = await (await overviewRoute.GET()).json();
+  assert.equal(other.accountBalanceCents, 0);
+  assert.equal(other.walletBalanceCents, 0);
+  assert.equal(other.portfolioValueCents, 0);
+  assert.deepEqual(other.invoices, []);
+  assert.deepEqual(other.occurrences, []);
+  assert.deepEqual(other.alerts, []);
+});
+
+test('advanced search filters across months, paginates totals and preserves tenant isolation', async () => {
+  const categories = await categoryIds();
+  for (let i = 0; i < 55; i++) {
+    await transactionsRoute.POST(
+      jsonRequest('/api/transactions', 'POST', {
+        description: i === 0 ? 'Alimentação 50%_ A' : `Alimentação A ${i}`,
+        type: 'expense',
+        amountCents: 100 + i,
+        transactionDate: i < 30 ? '2026-09-01' : '2026-10-01',
+        categoryId: categories['Alimentação'],
+      }),
+    );
+  }
+  const request = (params) =>
+    new Request(`https://local.test/api/transactions/search?${params}`);
+  const firstResponse = await searchRoute.GET(
+    request('q=ALIMENTACAO&sort=amount-desc'),
+  );
+  assert.equal(firstResponse.status, 200);
+  assert.equal(firstResponse.headers.get('cache-control'), 'private, no-store');
+  const first = await firstResponse.json();
+  assert.equal(first.total, 55);
+  assert.equal(first.transactions.length, 50);
+  assert.equal(first.transactions[0].amountCents, 154);
+  assert.equal(first.summary.expenseCents, 6985);
+  const next = await (
+    await searchRoute.GET(request('q=alimentacao&page=2&sort=amount-desc'))
+  ).json();
+  assert.equal(next.transactions.length, 5);
+  assert.equal(next.summary.expenseCents, 6985);
+  const filtered = await (
+    await searchRoute.GET(
+      request(
+        `from=2026-10-01&to=2026-10-31&type=expense&categoryId=${categories['Alimentação']}&minCents=130&maxCents=139`,
+      ),
+    )
+  ).json();
+  assert.equal(filtered.total, 10);
+  assert.equal(filtered.summary.expenseCents, 1345);
+  const literal = await (
+    await searchRoute.GET(request(new URLSearchParams({ q: '50%_' })))
+  ).json();
+  assert.equal(literal.total, 1);
+  assert.equal((await searchRoute.GET(request('page=0'))).status, 400);
+  const injection = await (
+    await searchRoute.GET(request(new URLSearchParams({ q: "' OR 1=1 --" })))
+  ).json();
+  assert.equal(injection.total, 0);
+  currentOwner = 'test-owner-b';
+  const other = await (
+    await searchRoute.GET(request('q=alimentacao&owner_id=test-owner-a'))
+  ).json();
+  assert.equal(other.total, 0);
+  assert.deepEqual(other.transactions, []);
 });
 
 function jsonRequest(path, method, body) {

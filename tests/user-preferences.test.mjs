@@ -9,6 +9,7 @@ import {
 test('preference validation accepts each supported theme and landing area', () => {
   for (const theme of ['dark', 'light', 'system']) {
     for (const defaultArea of [
+      'overview',
       'expenses',
       'investments',
       'credit-cards',

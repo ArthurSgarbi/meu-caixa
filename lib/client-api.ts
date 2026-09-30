@@ -2,12 +2,26 @@
 export async function apiFetch(url: string, options: RequestInit = {}) {
   const timeout = AbortSignal.timeout(30_000);
   try {
-    return await fetch(url, {
+    const response = await fetch(url, {
       ...options,
       signal: options.signal
         ? AbortSignal.any([options.signal, timeout])
         : timeout,
     });
+    // Uma gravação confirmada invalida os resumos, inclusive em outra área aberta.
+    if (
+      typeof window !== 'undefined' &&
+      response.ok &&
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(
+        (options.method ?? 'GET').toUpperCase(),
+      ) &&
+      /^\/api\/(transactions|budgets|credit-cards|investments|investment-wallet|recurring|data-restore)(\/|$)/.test(
+        url,
+      )
+    ) {
+      window.dispatchEvent(new Event('meu-caixa:finance-changed'));
+    }
+    return response;
   } catch (error) {
     if (options.signal?.aborted) throw error;
     if (timeout.aborted) {

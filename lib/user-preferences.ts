@@ -1,5 +1,6 @@
 /** Preferências de apresentação: nunca modificam valores ou regras financeiras. */
 export const landingAreas = [
+  'overview',
   'expenses',
   'investments',
   'credit-cards',
@@ -13,6 +14,9 @@ export type UserPreferences = {
   reduceMotion: boolean;
   marketAutoRefresh: boolean;
   defaultArea: (typeof landingAreas)[number];
+  alertBudgets: boolean;
+  alertInvoices: boolean;
+  alertRecurring: boolean;
 };
 
 export const defaultPreferences: Readonly<UserPreferences> = Object.freeze({
@@ -21,7 +25,10 @@ export const defaultPreferences: Readonly<UserPreferences> = Object.freeze({
   largeText: false,
   reduceMotion: false,
   marketAutoRefresh: true,
-  defaultArea: 'expenses',
+  defaultArea: 'overview',
+  alertBudgets: true,
+  alertInvoices: true,
+  alertRecurring: true,
 });
 
 /** Uma lista fechada evita salvar campos inesperados ou identidades do cliente. */
@@ -29,11 +36,7 @@ export function parsePreferences(input: unknown): UserPreferences | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const value = input as Record<string, unknown>;
   const keys = Object.keys(defaultPreferences);
-  if (
-    Object.keys(value).length !== keys.length ||
-    Object.keys(value).some((key) => !keys.includes(key))
-  )
-    return null;
+  if (Object.keys(value).some((key) => !keys.includes(key))) return null;
   if (
     !['dark', 'light', 'system'].includes(String(value.theme)) ||
     typeof value.theme !== 'string'
@@ -51,6 +54,10 @@ export function parsePreferences(input: unknown): UserPreferences | null {
   ]) {
     if (typeof value[key] !== 'boolean') return null;
   }
+  // Contas anteriores continuam válidas sem uma migração destrutiva do JSON.
+  for (const key of ['alertBudgets', 'alertInvoices', 'alertRecurring']) {
+    if (key in value && typeof value[key] !== 'boolean') return null;
+  }
   return {
     theme: value.theme as UserPreferences['theme'],
     hideBalances: value.hideBalances as boolean,
@@ -58,6 +65,9 @@ export function parsePreferences(input: unknown): UserPreferences | null {
     reduceMotion: value.reduceMotion as boolean,
     marketAutoRefresh: value.marketAutoRefresh as boolean,
     defaultArea: value.defaultArea as UserPreferences['defaultArea'],
+    alertBudgets: (value.alertBudgets as boolean | undefined) ?? true,
+    alertInvoices: (value.alertInvoices as boolean | undefined) ?? true,
+    alertRecurring: (value.alertRecurring as boolean | undefined) ?? true,
   };
 }
 

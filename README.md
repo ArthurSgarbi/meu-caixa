@@ -8,6 +8,16 @@ Recorrências mensais aparecem como **previsões** e não alteram o saldo até a
 
 Em **Seus dados e backup**, o usuário pode baixar as transações em CSV ou um JSON com todas as áreas financeiras e verificar/restaurar registros ausentes na mesma conta. Veja [o procedimento e as limitações](docs/backup-recovery.md).
 
+## Visão Geral, alertas e busca avançada
+
+- **Visão Geral** reúne o saldo confirmado até hoje, aportes, valores cadastrados dos ativos, faturas vencidas/a vencer em 30 dias, resumo do mês e recorrências pendentes. Saldo de aportes e carteira são apresentados separadamente: podem representar o mesmo dinheiro e não são somados como patrimônio. Faturas não são descontadas automaticamente da conta.
+- O **sino** abre avisos de orçamento a partir de 80%, faturas vencendo em até 7 dias ou vencidas sem confirmação de pagamento, e recorrências do mês cuja data chegou e ainda não foram confirmadas. Desabilite cada tipo em Configurações. São alertas ativos calculados pelos registros, não mensagens enviadas pelo banco ou notificações externas.
+- Em **Gastos → Busca avançada**, combine descrição (sem diferença de acentos), categoria, tipo, datas e valores mínimo/máximo. Datas vazias consultam todo o histórico. A busca pagina em 50 registros, com totais de todos os resultados e ordenação por data ou valor; não altera o resumo mensal. Compras de cartão continuam na área Cartões.
+
+`GET /api/overview` e `GET /api/transactions/search` exigem autenticação, vinculam todas as consultas à sessão e respondem com `private, no-store`. O resumo é atualizado após gravações financeiras, ao navegar entre áreas, ao retornar à página e a cada cinco minutos enquanto ela está visível. Consultas antigas são canceladas para não sobrescrever resultados recentes. Nenhuma cotação externa é consultada pela Visão Geral.
+
+As três preferências de alertas usam o JSON já existente: não é necessária nova migração. Preferências antigas preservam tema e área inicial; contas sem preferências começam na Visão Geral. A suíte inclui cenários de arredondamento, confirmação de recorrências, paginação, filtros inválidos, busca literal e isolamento entre usuários.
+
 ## Configurações do usuário
 
 A aba **Configurações** reúne tema escuro/claro/sistema, texto ampliado, redução de animações, modo discreto, área inicial, atualização automática das cotações e acesso ao perfil e segurança do Clerk. Também concentra **Seus dados e backup**.

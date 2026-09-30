@@ -17,6 +17,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Bot,
+  Bell,
+  LayoutDashboard,
   CalendarDays,
   ChartNoAxesCombined,
   ChevronLeft,
@@ -65,6 +67,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { currentMonthInBrazil, todayInBrazil } from '@/lib/finance-month';
 import { useLatestRequest } from '@/hooks/use-latest-request';
+import { useOverview } from '@/hooks/use-overview';
+import { visibleFinanceAlerts } from '@/lib/overview';
+import { OverviewPanel, AlertsDialog } from './overview-panel';
+import { TransactionSearchPanel } from './transaction-search-panel';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
@@ -236,6 +242,8 @@ export default function Home() {
     error: preferencesError,
   } = usePreferences();
   const [activeArea, setActiveArea] = useState<string | null>(null);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [searchActive, setSearchActive] = useState(false);
   const { signOut } = useClerk();
   const [session, setSession] = useState<SessionData | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -302,6 +310,17 @@ export default function Home() {
   }, [loadSession]);
 
   const user = session?.authenticated ? session.user : null;
+  const effectiveArea =
+    activeArea ?? (preferencesLoading ? 'overview' : preferences.defaultArea);
+  const overview = useOverview(Boolean(user), effectiveArea);
+  const alerts = visibleFinanceAlerts(overview.data?.alerts ?? [], preferences);
+  function navigateFromOverview(area: string) {
+    if (area === 'expenses') {
+      setMonth(currentMonthInBrazil());
+      setSearchActive(false);
+    }
+    setActiveArea(area);
+  }
 
   const beginDataRequest = useLatestRequest();
   const loadData = useCallback(
@@ -644,12 +663,10 @@ export default function Home() {
   return (
     <main className="brand-luxe min-h-screen text-foreground">
       <Tabs
-        value={
-          activeArea ??
-          (preferencesLoading ? 'expenses' : preferences.defaultArea)
-        }
+        value={effectiveArea}
         onValueChange={(value) => {
           setActiveArea(value);
+          if (value === 'expenses') void loadData(month);
           if (value === 'assistant') setAssistantVisited(true);
         }}
         className="gap-0"
@@ -674,6 +691,12 @@ export default function Home() {
                 aria-label="Áreas do Meu Caixa"
                 className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-foreground/15 bg-card/80 p-1 group-data-horizontal/tabs:h-auto sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0"
               >
+                <TabsTrigger
+                  value="overview"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground sm:px-4"
+                >
+                  <LayoutDashboard /> Visão Geral
+                </TabsTrigger>
                 <TabsTrigger
                   value="expenses"
                   className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
@@ -706,6 +729,34 @@ export default function Home() {
                 </TabsTrigger>
               </TabsList>
               <div className="flex shrink-0 self-end items-center gap-2 lg:self-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  aria-label={
+                    overview.error
+                      ? 'Alertas indisponíveis'
+                      : `Central de alertas: ${alerts.length} ativos`
+                  }
+                  title="Central de alertas"
+                  onClick={() => {
+                    setAlertsOpen(true);
+                    void overview.reload();
+                  }}
+                  className="relative size-10 shrink-0 rounded-xl border-foreground/15 bg-card/80"
+                >
+                  <Bell aria-hidden="true" />
+                  {!overview.loading &&
+                    !overview.error &&
+                    alerts.length > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] text-primary-foreground"
+                      >
+                        {alerts.length}
+                      </span>
+                    )}
+                </Button>
                 <Button
                   id="settings-navigation-button"
                   type="button"
@@ -762,6 +813,26 @@ export default function Home() {
             </Button>
           </div>
         )}
+        <AlertsDialog
+          open={alertsOpen}
+          onOpenChange={setAlertsOpen}
+          alerts={alerts}
+          loading={overview.loading}
+          error={overview.error}
+          onReload={() => void overview.reload()}
+          onNavigate={navigateFromOverview}
+        />
+        <TabsContent value="overview">
+          <OverviewPanel
+            data={overview.data}
+            alerts={alerts}
+            loading={overview.loading}
+            error={overview.error}
+            onReload={() => void overview.reload()}
+            onNavigate={navigateFromOverview}
+            onAlerts={() => setAlertsOpen(true)}
+          />
+        </TabsContent>
         <TabsContent value="expenses" keepMounted className="pb-16">
           <header className="border-b border-foreground/15 text-foreground">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
@@ -991,7 +1062,9 @@ export default function Home() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {loading
                       ? 'Carregando o mês...'
-                      : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
+                      : searchActive
+                        ? 'Busca no histórico completo com os filtros abaixo'
+                        : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
                   </p>
                 </div>
                 <CalendarDays
@@ -1000,99 +1073,114 @@ export default function Home() {
                 />
               </CardHeader>
               <CardContent className="px-0">
-                {loading ? (
-                  <div className="grid min-h-60 place-items-center text-muted-foreground">
-                    <LoaderCircle
-                      className="size-7 animate-spin"
-                      aria-label="Carregando transações"
-                    />
-                  </div>
-                ) : loadError ? (
-                  <div className="grid min-h-60 place-items-center px-6 text-center">
-                    <div>
-                      <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
-                      <p className="font-medium">
-                        Não foi possível abrir suas movimentações
-                      </p>
-                      <Button
-                        variant="outline"
-                        className="mt-4"
-                        onClick={() => void loadData(month)}
-                      >
-                        Tentar novamente
-                      </Button>
-                    </div>
-                  </div>
-                ) : data.transactions.length === 0 ? (
-                  <div className="grid min-h-60 place-items-center px-6 text-center">
-                    <div>
-                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-inverse/10 text-foreground">
-                        <ReceiptText />
-                      </span>
-                      <p className="font-semibold">
-                        Nenhuma movimentação neste mês
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Use o formulário para registrar sua primeira transação.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="pl-5">Data</TableHead>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead className="pr-5 text-right">Valor</TableHead>
-                        <TableHead className="w-12 pr-5">
-                          <span className="sr-only">Ações</span>
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {data.transactions.map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="pl-5 text-muted-foreground">
-                            {dateFormatter.format(
-                              new Date(
-                                `${transaction.transactionDate}T00:00:00Z`,
-                              ),
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {transaction.description}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {transaction.type === 'transfer'
-                                ? 'Transferência · Investimentos'
-                                : transaction.categoryName}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-foreground tabular-nums">
-                            {transaction.type === 'income' ? '+ ' : '− '}
-                            {formatCurrency(transaction.amountCents)}
-                          </TableCell>
-                          <TableCell className="pr-5 text-right">
-                            {transaction.type !== 'transfer' && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={`Editar ${transaction.description}`}
-                                onClick={() =>
-                                  openTransactionEditor(transaction)
-                                }
-                              >
-                                <Pencil />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <TransactionSearchPanel
+                  month={month}
+                  categories={data.categories}
+                  active={searchActive}
+                  onActiveChange={setSearchActive}
+                  refreshKey={budgetRefreshKey}
+                  onEdit={openTransactionEditor}
+                />
+                {!searchActive && (
+                  <>
+                    {loading ? (
+                      <div className="grid min-h-60 place-items-center text-muted-foreground">
+                        <LoaderCircle
+                          className="size-7 animate-spin"
+                          aria-label="Carregando transações"
+                        />
+                      </div>
+                    ) : loadError ? (
+                      <div className="grid min-h-60 place-items-center px-6 text-center">
+                        <div>
+                          <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
+                          <p className="font-medium">
+                            Não foi possível abrir suas movimentações
+                          </p>
+                          <Button
+                            variant="outline"
+                            className="mt-4"
+                            onClick={() => void loadData(month)}
+                          >
+                            Tentar novamente
+                          </Button>
+                        </div>
+                      </div>
+                    ) : data.transactions.length === 0 ? (
+                      <div className="grid min-h-60 place-items-center px-6 text-center">
+                        <div>
+                          <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-inverse/10 text-foreground">
+                            <ReceiptText />
+                          </span>
+                          <p className="font-semibold">
+                            Nenhuma movimentação neste mês
+                          </p>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Use o formulário para registrar sua primeira
+                            transação.
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="pl-5">Data</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Categoria</TableHead>
+                            <TableHead className="pr-5 text-right">
+                              Valor
+                            </TableHead>
+                            <TableHead className="w-12 pr-5">
+                              <span className="sr-only">Ações</span>
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {data.transactions.map((transaction) => (
+                            <TableRow key={transaction.id}>
+                              <TableCell className="pl-5 text-muted-foreground">
+                                {dateFormatter.format(
+                                  new Date(
+                                    `${transaction.transactionDate}T00:00:00Z`,
+                                  ),
+                                )}
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {transaction.description}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">
+                                  {transaction.type === 'transfer'
+                                    ? 'Transferência · Investimentos'
+                                    : transaction.categoryName}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-semibold text-foreground tabular-nums">
+                                {transaction.type === 'income' ? '+ ' : '− '}
+                                {formatCurrency(transaction.amountCents)}
+                              </TableCell>
+                              <TableCell className="pr-5 text-right">
+                                {transaction.type !== 'transfer' && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    aria-label={`Editar ${transaction.description}`}
+                                    onClick={() =>
+                                      openTransactionEditor(transaction)
+                                    }
+                                  >
+                                    <Pencil />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

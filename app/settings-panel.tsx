@@ -4,6 +4,7 @@ import { useClerk, useUser } from '@clerk/nextjs';
 import { useState, type ReactNode } from 'react';
 import {
   EyeOff,
+  Bell,
   LoaderCircle,
   Monitor,
   Moon,
@@ -190,6 +191,9 @@ export function SettingsPanel({
                   })
                 }
               >
+                <NativeSelectOption value="overview">
+                  Visão Geral
+                </NativeSelectOption>
                 <NativeSelectOption value="expenses">Gastos</NativeSelectOption>
                 <NativeSelectOption value="investments">
                   Investimentos
@@ -215,6 +219,39 @@ export function SettingsPanel({
               checked={preferences.marketAutoRefresh}
               onChange={(value) => void change({ marketAutoRefresh: value })}
             />
+          </fieldset>
+        </SettingsGroup>
+        <SettingsGroup title="Alertas financeiros" icon={<Bell />}>
+          <fieldset
+            disabled={disabled}
+            className="space-y-5 disabled:opacity-60"
+          >
+            <legend className="sr-only">Tipos de alertas habilitados</legend>
+            <ToggleSetting
+              id="alert-budgets"
+              title="Orçamentos"
+              description="Avisa a partir de 80% do limite e quando ele é atingido ou ultrapassado. Considera despesas registradas até hoje."
+              checked={preferences.alertBudgets}
+              onChange={(value) => void change({ alertBudgets: value })}
+            />
+            <ToggleSetting
+              id="alert-invoices"
+              title="Vencimento de faturas"
+              description="Avisa até 7 dias antes do vencimento e mantém faturas vencidas não marcadas como pagas."
+              checked={preferences.alertInvoices}
+              onChange={(value) => void change({ alertInvoices: value })}
+            />
+            <ToggleSetting
+              id="alert-recurring"
+              title="Recorrências pendentes"
+              description="Lembra de confirmar receitas ou despesas recorrentes do mês cuja data já chegou."
+              checked={preferences.alertRecurring}
+              onChange={(value) => void change({ alertRecurring: value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Os avisos aparecem no sino do site. Nenhum e-mail ou notificação
+              externa é enviado.
+            </p>
           </fieldset>
         </SettingsGroup>
         <SettingsGroup title="Minha conta" icon={<UserRound />}>
