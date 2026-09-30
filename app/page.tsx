@@ -704,35 +704,42 @@ export default function Home() {
                 >
                   <Bot /> Assistente IA
                 </TabsTrigger>
-                <TabsTrigger
-                  value="settings"
-                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
-                >
-                  <Settings /> Configurações
-                </TabsTrigger>
               </TabsList>
-              <div className="flex shrink-0 self-end items-center gap-2 rounded-xl border border-foreground/15 bg-card/80 px-3 py-2 lg:self-auto">
-                <span className="grid size-7 place-items-center rounded-full bg-inverse text-xs font-bold text-inverse-foreground">
-                  {user.displayName.charAt(0).toUpperCase()}
-                </span>
-                <div className="hidden max-w-36 sm:block">
-                  <p className="truncate text-xs font-semibold">
-                    {user.displayName}
-                  </p>
-                  <p className="truncate text-[11px] text-foreground/65">
-                    Conta protegida
-                  </p>
-                </div>
+              <div className="flex shrink-0 self-end items-center gap-2 lg:self-auto">
                 <Button
+                  id="settings-navigation-button"
                   type="button"
-                  onClick={() => void signOut({ redirectUrl: '/' })}
-                  aria-label="Sair da conta"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-foreground/75 hover:bg-card/80 hover:text-foreground"
+                  variant="outline"
+                  aria-controls="settings-panel"
+                  aria-pressed={activeArea === 'settings'}
+                  onClick={() => setActiveArea('settings')}
+                  className="h-10 shrink-0 rounded-xl border-foreground/15 bg-card/80 px-3 text-foreground/75 hover:bg-card hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground"
                 >
-                  <LogOut />
+                  <Settings aria-hidden="true" /> Configurações
                 </Button>
+                <div className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-card/80 px-3 py-2">
+                  <span className="grid size-7 place-items-center rounded-full bg-inverse text-xs font-bold text-inverse-foreground">
+                    {user.displayName.charAt(0).toUpperCase()}
+                  </span>
+                  <div className="hidden max-w-36 sm:block">
+                    <p className="truncate text-xs font-semibold">
+                      {user.displayName}
+                    </p>
+                    <p className="truncate text-[11px] text-foreground/65">
+                      Conta protegida
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => void signOut({ redirectUrl: '/' })}
+                    aria-label="Sair da conta"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-foreground/75 hover:bg-card/80 hover:text-foreground"
+                  >
+                    <LogOut />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1367,7 +1374,11 @@ export default function Home() {
             <AssistantPanel />
           )}
         </TabsContent>
-        <TabsContent value="settings">
+        <TabsContent
+          value="settings"
+          id="settings-panel"
+          aria-labelledby="settings-navigation-button"
+        >
           <SettingsPanel
             onRestored={async () => {
               await loadData(month);
