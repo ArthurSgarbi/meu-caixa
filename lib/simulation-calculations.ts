@@ -50,6 +50,9 @@ export function simulateDebt(
     const valueCents = Math.round(
       principalCents * Math.pow(1 + monthlyRate, month),
     );
+    if (!Number.isSafeInteger(valueCents)) {
+      return { points: [], finalAmountCents: 0, totalInterestCents: 0 };
+    }
     points.push({ month, valueCents });
   }
 
@@ -94,6 +97,19 @@ export function simulateInvestment(
 
   for (let month = 1; month <= months; month += 1) {
     balanceCents = balanceCents * (1 + monthlyRate) + monthlyContributionCents;
+    if (
+      !Number.isSafeInteger(Math.round(balanceCents)) ||
+      !Number.isSafeInteger(
+        initialValueCents + monthlyContributionCents * month,
+      )
+    ) {
+      return {
+        points: [],
+        finalAmountCents: 0,
+        totalContributedCents: 0,
+        totalEarningsCents: 0,
+      };
+    }
     points.push({ month, valueCents: Math.round(balanceCents) });
   }
 

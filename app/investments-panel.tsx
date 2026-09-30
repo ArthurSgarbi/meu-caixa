@@ -1,4 +1,10 @@
 'use client';
+import {
+  parseCurrencyToCents,
+  parseDecimal as parseNumericInput,
+} from '@/lib/frontend-input';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import {
   ReactNode,
@@ -169,34 +175,47 @@ function formatCurrencyInput(cents: number) {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-function parseCurrencyToCents(value: string) {
-  const normalized = value.includes(',')
-    ? value
-        .replace(/[^\d,-]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-    : value.replace(/[^\d.-]/g, '');
-  const amount = Number(normalized);
-  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
-}
-
 function formString(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value : '';
 }
 
 function parsePercentage(value: string) {
-  const parsed = Number(value.trim().replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : 0;
+  return parseNumericInput(value);
 }
 
 function parseDecimal(value: string) {
-  const parsed = Number(value.trim().replace(',', '.'));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  return value.trim() ? parseNumericInput(value) : 0;
+}
+
+function validateInvestment(payload: {
+  investedCents: number;
+  currentValueCents: number;
+  ticker: string;
+  quantity: number;
+}) {
+  if (
+    !Number.isSafeInteger(payload.investedCents) ||
+    payload.investedCents <= 0 ||
+    !Number.isSafeInteger(payload.currentValueCents) ||
+    payload.currentValueCents < 0
+  ) {
+    return 'Informe valores válidos para o valor aplicado e o valor atual.';
+  }
+  if (
+    !Number.isFinite(payload.quantity) ||
+    payload.quantity < 0 ||
+    payload.quantity > 1_000_000_000 ||
+    Boolean(payload.ticker) !== payload.quantity > 0
+  ) {
+    return 'Preencha um código B3 e uma quantidade positiva, ou deixe ambos vazios.';
+  }
+  return '';
 }
 
 export function InvestmentsPanel() {
   const [data, setData] = useState<InvestmentData>(emptyData);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -212,82 +231,103 @@ export function InvestmentsPanel() {
   const [walletData, setWalletData] =
     useState<InvestmentWalletData>(emptyWalletData);
   const [walletLoading, setWalletLoading] = useState(true);
+  const [walletLoadFailed, setWalletLoadFailed] = useState(false);
   const [walletSaving, setWalletSaving] = useState(false);
   const [walletMessage, setWalletMessage] = useState('');
   const [walletError, setWalletError] = useState('');
   const [annualCdiRate, setAnnualCdiRate] = useState('10,50');
   const [cdbPercentage, setCdbPercentage] = useState('100');
 
-  const loadInvestments = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await fetch('/api/investments', { signal });
-      const result = (await response.json()) as InvestmentData & {
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          result.error ?? 'Não foi possível carregar seus investimentos.',
+  const beginInvestmentsRequest = useLatestRequest();
+  const beginWalletRequest = useLatestRequest();
+  const loadInvestments = useCallback(
+    async (signal?: AbortSignal) => {
+      signal = beginInvestmentsRequest(signal).signal;
+      if (signal.aborted) return;
+      setLoading(true);
+      setLoadFailed(false);
+      setError('');
+      try {
+        const response = await apiFetch('/api/investments', { signal });
+        const result = (await readApiJson(response)) as InvestmentData & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? 'Não foi possível carregar seus investimentos.',
+          );
+        }
+        if (signal.aborted) return;
+        setData(result);
+      } catch (requestError) {
+        if (signal.aborted) return;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return;
+        }
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Não foi possível carregar seus investimentos.',
         );
+        setLoadFailed(true);
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-      setData(result);
-    } catch (requestError) {
-      if (
-        requestError instanceof DOMException &&
-        requestError.name === 'AbortError'
-      ) {
-        return;
-      }
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Não foi possível carregar seus investimentos.',
-      );
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
+    },
+    [beginInvestmentsRequest],
+  );
 
-  const loadWallet = useCallback(async (signal?: AbortSignal) => {
-    setWalletLoading(true);
-    setWalletError('');
-    try {
-      const response = await fetch('/api/investment-wallet', { signal });
-      const result = (await response.json()) as InvestmentWalletData & {
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          result.error ?? 'Não foi possível carregar seu saldo investido.',
+  const loadWallet = useCallback(
+    async (signal?: AbortSignal) => {
+      signal = beginWalletRequest(signal).signal;
+      if (signal.aborted) return;
+      setWalletLoading(true);
+      setWalletLoadFailed(false);
+      setWalletError('');
+      try {
+        const response = await apiFetch('/api/investment-wallet', { signal });
+        const result = (await readApiJson(response)) as InvestmentWalletData & {
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? 'Não foi possível carregar seu saldo investido.',
+          );
+        }
+        if (signal.aborted) return;
+        setWalletData(result);
+        setAnnualCdiRate(
+          result.wallet.annualCdiRate.toFixed(2).replace('.', ','),
         );
+        setCdbPercentage(
+          result.wallet.cdbPercentage
+            .toFixed(2)
+            .replace(/\.00$/, '')
+            .replace('.', ','),
+        );
+      } catch (requestError) {
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return;
+        }
+        if (signal.aborted) return;
+        setWalletError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Não foi possível carregar seu saldo investido.',
+        );
+        setWalletLoadFailed(true);
+      } finally {
+        if (!signal?.aborted) setWalletLoading(false);
       }
-      setWalletData(result);
-      setAnnualCdiRate(
-        result.wallet.annualCdiRate.toFixed(2).replace('.', ','),
-      );
-      setCdbPercentage(
-        result.wallet.cdbPercentage
-          .toFixed(2)
-          .replace(/\.00$/, '')
-          .replace('.', ','),
-      );
-    } catch (requestError) {
-      if (
-        requestError instanceof DOMException &&
-        requestError.name === 'AbortError'
-      ) {
-        return;
-      }
-      setWalletError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Não foi possível carregar seu saldo investido.',
-      );
-    } finally {
-      if (!signal?.aborted) setWalletLoading(false);
-    }
-  }, []);
+    },
+    [beginWalletRequest],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -329,14 +369,25 @@ export function InvestmentsPanel() {
       ),
     [annualCdiRate, cdbPercentage, walletData.wallet.balanceCents],
   );
+  const ratesValid =
+    Number.isFinite(parsePercentage(annualCdiRate)) &&
+    parsePercentage(annualCdiRate) >= 0 &&
+    parsePercentage(annualCdiRate) <= 100 &&
+    Number.isFinite(parsePercentage(cdbPercentage)) &&
+    parsePercentage(cdbPercentage) >= 0 &&
+    parsePercentage(cdbPercentage) <= 500;
 
   async function handleRateSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!ratesValid) {
+      setWalletError('Informe CDI entre 0 e 100% e CDB entre 0 e 500% do CDI.');
+      return;
+    }
     setWalletSaving(true);
     setWalletError('');
     setWalletMessage('');
     try {
-      const response = await fetch('/api/investment-wallet', {
+      const response = await apiFetch('/api/investment-wallet', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -344,7 +395,7 @@ export function InvestmentsPanel() {
           cdbPercentage: parsePercentage(cdbPercentage),
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(result.error ?? 'Não foi possível salvar as taxas.');
       }
@@ -381,14 +432,19 @@ export function InvestmentsPanel() {
       acquisitionDate: formString(form.get('acquisitionDate')),
     };
 
+    const validationError = validateInvestment(payload);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSaving(true);
     try {
-      const response = await fetch('/api/investments', {
+      const response = await apiFetch('/api/investments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(
           result.error ?? 'Não foi possível registrar o investimento.',
@@ -428,15 +484,20 @@ export function InvestmentsPanel() {
       acquisitionDate: formString(form.get('editAcquisitionDate')),
     };
 
+    const validationError = validateInvestment(payload);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
     setEditSaving(true);
     setEditError('');
     try {
-      const response = await fetch('/api/investments', {
+      const response = await apiFetch('/api/investments', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(
           result.error ??
@@ -464,12 +525,12 @@ export function InvestmentsPanel() {
     setDeleteSaving(true);
     setDeleteError('');
     try {
-      const response = await fetch('/api/investments', {
+      const response = await apiFetch('/api/investments', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deletingInvestment.id }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(
           result.error ?? 'Não foi possível remover o investimento.',
@@ -531,22 +592,38 @@ export function InvestmentsPanel() {
           <div className="grid gap-3 md:grid-cols-3">
             <InvestmentSummary
               label="Saldo da conta"
-              value={formatCurrency(walletData.mainBalanceCents)}
+              value={
+                walletLoadFailed
+                  ? '—'
+                  : formatCurrency(walletData.mainBalanceCents)
+              }
               detail="Disponível para investir"
               icon={<Landmark />}
               loading={walletLoading}
             />
             <InvestmentSummary
               label="Saldo investido"
-              value={formatCurrency(walletData.wallet.balanceCents)}
+              value={
+                walletLoadFailed
+                  ? '—'
+                  : formatCurrency(walletData.wallet.balanceCents)
+              }
               icon={<BriefcaseBusiness />}
               loading={walletLoading}
               featured
             />
             <InvestmentSummary
               label="Rendimento do dia"
-              value={`+ ${formatCurrency(liveDailyYield.dailyYieldCents)}`}
-              detail={`${(liveDailyYield.dailyRate * 100).toFixed(4).replace('.', ',')}% ao dia`}
+              value={
+                ratesValid && !walletError
+                  ? `+ ${formatCurrency(liveDailyYield.dailyYieldCents)}`
+                  : '—'
+              }
+              detail={
+                ratesValid && !walletLoadFailed
+                  ? `${(liveDailyYield.dailyRate * 100).toFixed(4).replace('.', ',')}% ao dia`
+                  : undefined
+              }
               icon={<TrendingUp />}
               loading={walletLoading}
             />
@@ -592,35 +669,42 @@ export function InvestmentsPanel() {
                 </div>
               </div>
 
-              <div className="grid gap-3 rounded-xl border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Taxa efetiva anual
-                  </p>
-                  <p className="mt-1 font-bold tabular-nums">
-                    {liveDailyYield.effectiveAnnualRatePercent
-                      .toFixed(2)
-                      .replace('.', ',')}
-                    %
-                  </p>
+              {!ratesValid && (
+                <p role="alert" className="text-sm text-red-200">
+                  Informe CDI entre 0 e 100% e CDB entre 0 e 500% do CDI para
+                  calcular.
+                </p>
+              )}
+              {ratesValid && !walletLoadFailed && (
+                <div className="grid gap-3 rounded-xl border border-white/10 bg-white/5 p-4 sm:grid-cols-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Taxa efetiva anual
+                    </p>
+                    <p className="mt-1 font-bold tabular-nums">
+                      {liveDailyYield.effectiveAnnualRatePercent
+                        .toFixed(2)
+                        .replace('.', ',')}
+                      %
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Taxa diária</p>
+                    <p className="mt-1 font-bold tabular-nums">
+                      {(liveDailyYield.dailyRate * 100)
+                        .toFixed(6)
+                        .replace('.', ',')}
+                      %
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Rende hoje</p>
+                    <p className="mt-1 font-bold text-white tabular-nums">
+                      {formatCurrency(liveDailyYield.dailyYieldCents)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Taxa diária</p>
-                  <p className="mt-1 font-bold tabular-nums">
-                    {(liveDailyYield.dailyRate * 100)
-                      .toFixed(6)
-                      .replace('.', ',')}
-                    %
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Rende hoje</p>
-                  <p className="mt-1 font-bold text-white tabular-nums">
-                    {formatCurrency(liveDailyYield.dailyYieldCents)}
-                  </p>
-                </div>
-              </div>
-
+              )}
               {(walletMessage || walletError) && (
                 <output
                   aria-live="polite"
@@ -639,7 +723,12 @@ export function InvestmentsPanel() {
 
               <Button
                 type="submit"
-                disabled={walletSaving || walletLoading}
+                disabled={
+                  walletSaving ||
+                  walletLoading ||
+                  walletLoadFailed ||
+                  !ratesValid
+                }
                 className="bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
               >
                 {walletSaving ? (
@@ -668,6 +757,14 @@ export function InvestmentsPanel() {
               <div className="grid h-40 place-items-center text-muted-foreground">
                 <LoaderCircle className="size-7 animate-spin" />
               </div>
+            ) : walletLoadFailed ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void loadWallet()}
+              >
+                Tentar carregar saldos novamente
+              </Button>
             ) : walletData.contributions.length === 0 ? (
               <div className="grid h-40 place-items-center px-4 text-center">
                 <div>
@@ -716,23 +813,35 @@ export function InvestmentsPanel() {
         <div className="grid gap-3 md:grid-cols-3">
           <InvestmentSummary
             label="Total aplicado"
-            value={formatCurrency(data.summary.investedCents)}
+            value={
+              loadFailed ? '—' : formatCurrency(data.summary.investedCents)
+            }
             icon={<CircleDollarSign />}
             loading={loading}
           />
           <InvestmentSummary
             label="Patrimônio atual"
-            value={formatCurrency(data.summary.currentValueCents)}
+            value={
+              loadFailed ? '—' : formatCurrency(data.summary.currentValueCents)
+            }
             icon={<BriefcaseBusiness />}
             loading={loading}
             featured
           />
           <InvestmentSummary
             label="Resultado acumulado"
-            value={`${profitIsPositive ? '+' : '−'} ${formatCurrency(
-              Math.abs(data.summary.profitCents),
-            )}`}
-            detail={`${profitIsPositive ? '+' : ''}${data.summary.returnPercentage.toFixed(2).replace('.', ',')}%`}
+            value={
+              loadFailed
+                ? '—'
+                : `${profitIsPositive ? '+' : '−'} ${formatCurrency(
+                    Math.abs(data.summary.profitCents),
+                  )}`
+            }
+            detail={
+              loadFailed
+                ? undefined
+                : `${profitIsPositive ? '+' : ''}${data.summary.returnPercentage.toFixed(2).replace('.', ',')}%`
+            }
             icon={profitIsPositive ? <ArrowUpRight /> : <ArrowDownRight />}
             loading={loading}
             positive={profitIsPositive}
@@ -898,6 +1007,13 @@ export function InvestmentsPanel() {
                 <div className="grid h-72 place-items-center text-muted-foreground">
                   <LoaderCircle className="size-7 animate-spin" />
                 </div>
+              ) : loadFailed ? (
+                <Button
+                  variant="outline"
+                  onClick={() => void loadInvestments()}
+                >
+                  Tentar carregar carteira novamente
+                </Button>
               ) : chartData.length === 0 ? (
                 <div className="grid h-72 place-items-center px-6 text-center">
                   <div>
@@ -987,7 +1103,7 @@ export function InvestmentsPanel() {
                 Seus ativos
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                {data.investments.length}{' '}
+                {loadFailed ? '—' : data.investments.length}{' '}
                 {data.investments.length === 1
                   ? 'investimento cadastrado'
                   : 'investimentos cadastrados'}
@@ -998,6 +1114,11 @@ export function InvestmentsPanel() {
                 <div className="grid h-64 place-items-center text-muted-foreground">
                   <LoaderCircle className="size-7 animate-spin" />
                 </div>
+              ) : loadFailed ? (
+                <p role="alert" className="text-sm text-red-200">
+                  Não foi possível carregar os ativos. Tente novamente na
+                  distribuição da carteira.
+                </p>
               ) : data.investments.length === 0 ? (
                 <div className="grid h-64 place-items-center px-4 text-center">
                   <div>

@@ -1,4 +1,6 @@
 'use client';
+import { parseCurrencyToCents } from '@/lib/frontend-input';
+import { apiFetch, readApiJson } from '@/lib/client-api';
 
 import { useClerk } from '@clerk/nextjs';
 import {
@@ -7,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -60,6 +63,7 @@ import {
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { currentMonthInBrazil, todayInBrazil } from '@/lib/finance-month';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
@@ -177,40 +181,35 @@ function formatCurrencyInput(cents: number) {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-function parseCurrencyToCents(value: string) {
-  const normalized = value.includes(',')
-    ? value
-        .replace(/[^\d,-]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-    : value.replace(/[^\d.-]/g, '');
-  const amount = Number(normalized);
-  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
-}
-
 function formString(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value : '';
 }
 
 async function createTransaction(input: CreateTransactionInput) {
-  const response = await fetch('/api/transactions', {
+  const response = await apiFetch('/api/transactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  const result = (await response.json()) as { id?: number; error?: string };
+  const result = (await readApiJson(response)) as {
+    id?: number;
+    error?: string;
+  };
   if (!response.ok)
     throw new Error(result.error ?? 'Não foi possível registrar a transação.');
   return result;
 }
 
 async function updateTransaction(input: UpdateTransactionInput) {
-  const response = await fetch('/api/transactions', {
+  const response = await apiFetch('/api/transactions', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
-  const result = (await response.json()) as { id?: number; error?: string };
+  const result = (await readApiJson(response)) as {
+    id?: number;
+    error?: string;
+  };
   if (!response.ok)
     throw new Error(
       result.error ?? 'Não foi possível salvar as alterações da transação.',
@@ -241,13 +240,19 @@ export default function Home() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState('');
+  const [assistantVisited, setAssistantVisited] = useState(false);
   const [month, setMonth] = useState(currentMonthInBrazil);
+  const visibleMonth = useRef(month);
+  useEffect(() => {
+    visibleMonth.current = month;
+  }, [month]);
   const [data, setData] = useState<FinanceData>(emptyData);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [type, setType] = useState<TransactionType>('expense');
   const [categoryId, setCategoryId] = useState('');
   const [editingTransaction, setEditingTransaction] =
@@ -266,8 +271,8 @@ export default function Home() {
   const loadSession = useCallback(async (signal?: AbortSignal) => {
     setSessionError('');
     try {
-      const response = await fetch('/api/session', { signal });
-      const result = (await response.json()) as SessionData;
+      const response = await apiFetch('/api/session', { signal });
+      const result = (await readApiJson(response)) as SessionData;
       if (!response.ok)
         throw new Error('Não foi possível verificar sua conta.');
       setSession(result);
@@ -298,38 +303,46 @@ export default function Home() {
 
   const user = session?.authenticated ? session.user : null;
 
+  const beginDataRequest = useLatestRequest();
   const loadData = useCallback(
     async (selectedMonth: string, signal?: AbortSignal) => {
+      if (selectedMonth !== visibleMonth.current) return;
+      signal = beginDataRequest(signal).signal;
+      if (signal.aborted) return;
       setLoading(true);
+      setLoadError('');
       setError('');
       try {
-        const response = await fetch(
+        const response = await apiFetch(
           `/api/transactions?month=${selectedMonth}`,
           { signal },
         );
-        const result = (await response.json()) as FinanceData & {
+        const result = (await readApiJson(response)) as FinanceData & {
           error?: string;
         };
         if (!response.ok)
           throw new Error(result.error ?? 'Não foi possível carregar o mês.');
+        if (signal.aborted) return;
         setData(result);
         setBudgetRefreshKey((value) => value + 1);
       } catch (requestError) {
+        if (signal.aborted) return;
         if (
           requestError instanceof DOMException &&
           requestError.name === 'AbortError'
         )
           return;
-        setError(
+        const failure =
           requestError instanceof Error
             ? requestError.message
-            : 'Não foi possível carregar o mês.',
-        );
+            : 'Não foi possível carregar o mês.';
+        setError(failure);
+        setLoadError(failure);
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [],
+    [beginDataRequest],
   );
 
   useEffect(() => {
@@ -438,6 +451,14 @@ export default function Home() {
       categoryId: Number(selectedCategoryId),
     };
 
+    if (
+      !Number.isSafeInteger(input.amountCents) ||
+      input.amountCents <= 0 ||
+      input.amountCents > 2_147_483_647
+    ) {
+      setError('Informe um valor válido maior que zero, como 1.000,50.');
+      return;
+    }
     setSaving(true);
     try {
       await createTransaction(input);
@@ -469,15 +490,28 @@ export default function Home() {
     const contributionDate = formString(form.get('investmentDate'));
     const description = formString(form.get('investmentDescription')).trim();
 
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+      setInvestmentTransferError('Informe um valor válido maior que zero.');
+      return;
+    }
+    if (
+      investmentAvailableBalanceCents === null ||
+      amountCents > investmentAvailableBalanceCents
+    ) {
+      setInvestmentTransferError(
+        'O aporte deve caber no saldo disponível da conta.',
+      );
+      return;
+    }
     setInvestmentTransferSaving(true);
     setInvestmentTransferError('');
     try {
-      const response = await fetch('/api/investment-wallet', {
+      const response = await apiFetch('/api/investment-wallet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amountCents, contributionDate, description }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(result.error ?? 'Não foi possível realizar o aporte.');
       }
@@ -507,8 +541,8 @@ export default function Home() {
     setInvestmentAvailableBalanceCents(null);
     setInvestmentTransferOpen(true);
     try {
-      const response = await fetch('/api/investment-wallet');
-      const result = (await response.json()) as {
+      const response = await apiFetch('/api/investment-wallet');
+      const result = (await readApiJson(response)) as {
         mainBalanceCents?: number;
         error?: string;
       };
@@ -549,6 +583,14 @@ export default function Home() {
       categoryId: Number(selectedEditCategoryId),
     };
 
+    if (
+      !Number.isSafeInteger(input.amountCents) ||
+      input.amountCents <= 0 ||
+      input.amountCents > 2_147_483_647
+    ) {
+      setEditError('Informe um valor válido maior que zero.');
+      return;
+    }
     setEditSaving(true);
     setEditError('');
     try {
@@ -601,7 +643,13 @@ export default function Home() {
 
   return (
     <main className="brand-luxe min-h-screen text-white">
-      <Tabs defaultValue="expenses" className="gap-0">
+      <Tabs
+        defaultValue="expenses"
+        onValueChange={(value) => {
+          if (value === 'assistant') setAssistantVisited(true);
+        }}
+        className="gap-0"
+      >
         <nav className="border-b border-white/15 text-white">
           <div className="mx-auto flex max-w-7xl min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
@@ -617,8 +665,11 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex w-full min-w-0 items-center gap-3 lg:w-auto lg:flex-1 lg:justify-end">
-              <TabsList className="h-auto min-w-0 flex-1 flex-nowrap justify-start overflow-x-auto rounded-xl border border-white/15 bg-[#212F52]/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="flex w-full min-w-0 flex-col-reverse items-stretch gap-3 lg:w-auto lg:flex-1 lg:flex-row lg:items-center lg:justify-end">
+              <TabsList
+                aria-label="Áreas do Meu Caixa"
+                className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-white/15 bg-[#212F52]/80 p-1 sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0 [&>[data-slot=tabs-trigger]:last-child]:col-span-2"
+              >
                 <TabsTrigger
                   value="expenses"
                   className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
@@ -650,7 +701,7 @@ export default function Home() {
                   <Bot /> Assistente IA
                 </TabsTrigger>
               </TabsList>
-              <div className="flex shrink-0 items-center gap-2 rounded-xl border border-white/15 bg-[#212F52]/80 px-3 py-2">
+              <div className="flex shrink-0 self-end items-center gap-2 rounded-xl border border-white/15 bg-[#212F52]/80 px-3 py-2 lg:self-auto">
                 <span className="grid size-7 place-items-center rounded-full bg-white text-xs font-bold text-black">
                   {user.displayName.charAt(0).toUpperCase()}
                 </span>
@@ -677,7 +728,7 @@ export default function Home() {
           </div>
         </nav>
 
-        <TabsContent value="expenses" className="pb-16">
+        <TabsContent value="expenses" keepMounted className="pb-16">
           <header className="border-b border-white/15 text-white">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -715,6 +766,7 @@ export default function Home() {
                   </Button>
                   <Button
                     aria-label="Mês anterior"
+                    disabled={saving || editSaving || investmentTransferSaving}
                     size="icon"
                     onClick={() => changeMonth(-1)}
                     className="border border-white/15 bg-[#212F52]/80 text-white hover:bg-[#2E416B]"
@@ -723,6 +775,7 @@ export default function Home() {
                   </Button>
                   <Button
                     aria-label="Próximo mês"
+                    disabled={saving || editSaving || investmentTransferSaving}
                     size="icon"
                     onClick={() => changeMonth(1)}
                     className="border border-white/15 bg-[#212F52]/80 text-white hover:bg-[#2E416B]"
@@ -738,28 +791,36 @@ export default function Home() {
               >
                 <SummaryCard
                   label="Receitas"
-                  value={formatCurrency(data.summary.incomeCents)}
+                  value={
+                    loadError ? '—' : formatCurrency(data.summary.incomeCents)
+                  }
                   icon={<ArrowUpRight />}
                   tone="positive"
                   loading={loading}
                 />
                 <SummaryCard
                   label="Despesas"
-                  value={formatCurrency(data.summary.expenseCents)}
+                  value={
+                    loadError ? '—' : formatCurrency(data.summary.expenseCents)
+                  }
                   icon={<ArrowDownLeft />}
                   tone="negative"
                   loading={loading}
                 />
                 <SummaryCard
                   label="Transferido para investimentos"
-                  value={formatCurrency(data.summary.transferCents)}
+                  value={
+                    loadError ? '—' : formatCurrency(data.summary.transferCents)
+                  }
                   icon={<PiggyBank />}
                   tone="balance"
                   loading={loading}
                 />
                 <SummaryCard
                   label="Saldo do mês após aportes"
-                  value={formatCurrency(data.summary.balanceCents)}
+                  value={
+                    loadError ? '—' : formatCurrency(data.summary.balanceCents)
+                  }
                   icon={<WalletCards />}
                   tone="balance"
                   loading={loading}
@@ -912,7 +973,7 @@ export default function Home() {
                       aria-label="Carregando transações"
                     />
                   </div>
-                ) : error && data.transactions.length === 0 ? (
+                ) : loadError ? (
                   <div className="grid min-h-60 place-items-center px-6 text-center">
                     <div>
                       <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
@@ -1277,8 +1338,8 @@ export default function Home() {
           <SimulationsPanel />
         </TabsContent>
 
-        <TabsContent value="assistant">
-          <AssistantPanel />
+        <TabsContent value="assistant" keepMounted>
+          {assistantVisited && <AssistantPanel />}
         </TabsContent>
       </Tabs>
     </main>

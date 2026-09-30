@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch, readApiJson } from '@/lib/client-api';
 
 import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from 'react';
 import {
@@ -46,15 +47,22 @@ export function AssistantPanel() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const conversationRef = useRef<HTMLDivElement>(null);
+  const pending = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const conversation = conversationRef.current;
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
   }, [messages, sending]);
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   async function sendMessage(rawMessage: string) {
     const content = rawMessage.trim();
-    if (!content || sending) return;
+    if (!content || pending.current) return;
+    pending.current = true;
+    const controller = new AbortController();
+    requestRef.current = controller;
 
     const userMessage: ChatMessage = {
       id: newMessageId(),
@@ -75,12 +83,13 @@ export function AssistantPanel() {
     setSending(true);
 
     try {
-      const response = await fetch('/api/assistant', {
+      const response = await apiFetch('/api/assistant', {
+        signal: controller.signal,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: content, history }),
       });
-      const result = (await response.json()) as {
+      const result = (await readApiJson(response)) as {
         answer?: string;
         error?: string;
       };
@@ -90,6 +99,7 @@ export function AssistantPanel() {
         );
       }
 
+      if (controller.signal.aborted) return;
       setMessages((current) => [
         ...current,
         {
@@ -99,18 +109,28 @@ export function AssistantPanel() {
         },
       ]);
     } catch (requestError) {
+      if (controller.signal.aborted) return;
+      setDraft(content);
+      setMessages((current) =>
+        current.filter((message) => message.id !== userMessage.id),
+      );
       setError(
         requestError instanceof Error
           ? requestError.message
           : 'A assistente não conseguiu responder agora.',
       );
     } finally {
-      setSending(false);
+      pending.current = false;
+      if (!controller.signal.aborted) setSending(false);
     }
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      !event.nativeEvent.isComposing
+    ) {
       event.preventDefault();
       void sendMessage(draft);
     }
@@ -155,7 +175,9 @@ export function AssistantPanel() {
 
           <CardContent className="p-0">
             <div
-              className="h-[510px] overflow-y-auto px-4 py-6 sm:px-6"
+              ref={conversationRef}
+              role="log"
+              className="h-[min(510px,55dvh)] min-h-48 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6"
               aria-live="polite"
               aria-label="Mensagens da conversa"
             >
@@ -171,7 +193,7 @@ export function AssistantPanel() {
                       </span>
                     ) : null}
                     <div
-                      className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[75%] ${
+                      className={`min-w-0 max-w-[85%] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[75%] ${
                         message.role === 'user'
                           ? 'rounded-br-md bg-gradient-to-br from-[#EEE6DB] to-[#D2B589] text-[#0B0B0D]'
                           : 'rounded-bl-md border border-white/10 bg-white/[0.065] text-white/90'
@@ -202,7 +224,6 @@ export function AssistantPanel() {
                     </div>
                   </div>
                 ) : null}
-                <div ref={endRef} />
               </div>
             </div>
 

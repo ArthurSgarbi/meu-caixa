@@ -1,4 +1,7 @@
 'use client';
+import { parseCurrencyToCents, parseDecimal } from '@/lib/frontend-input';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import {
   type ReactNode,
@@ -66,23 +69,12 @@ function formatCurrencyInput(cents: number) {
   return (cents / 100).toFixed(2).replace('.', ',');
 }
 
-function parseCurrencyToCents(value: string) {
-  const normalized = value.includes(',')
-    ? value
-        .replace(/[^\d,-]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-    : value.replace(/[^\d.-]/g, '');
-  const amount = Number(normalized);
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : 0;
-}
-
 function parsePercentage(value: string) {
-  const parsed = Number(value.trim().replace(',', '.'));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  return parseDecimal(value);
 }
 
 function parsePositiveInteger(value: string) {
+  if (!/^\d+$/.test(value.trim())) return 0;
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
 }
@@ -115,6 +107,7 @@ export function SimulationsPanel() {
   const [savingType, setSavingType] = useState<SimulationType | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [savedLoadFailed, setSavedLoadFailed] = useState(false);
 
   const debtSimulation = useMemo(
     () =>
@@ -145,37 +138,52 @@ export function SimulationsPanel() {
   const futureExpenseCents = parseCurrencyToCents(futureExpense);
   const comparisonCents =
     investmentSimulation.finalAmountCents - futureExpenseCents;
+  const debtValid = debtSimulation.points.length > 0;
+  const investmentValid =
+    investmentSimulation.points.length > 0 &&
+    Number.isSafeInteger(futureExpenseCents) &&
+    futureExpenseCents >= 0;
 
-  const loadSavedSimulations = useCallback(async (signal?: AbortSignal) => {
-    setSavedLoading(true);
-    try {
-      const response = await fetch('/api/simulations', { signal });
-      const result = (await response.json()) as {
-        simulations?: SavedSimulation[];
-        error?: string;
-      };
-      if (!response.ok) {
-        throw new Error(
-          result.error ?? 'Não foi possível carregar seus cenários.',
+  const beginSavedRequest = useLatestRequest();
+  const loadSavedSimulations = useCallback(
+    async (signal?: AbortSignal) => {
+      signal = beginSavedRequest(signal).signal;
+      if (signal.aborted) return;
+      setSavedLoading(true);
+      setSavedLoadFailed(false);
+      try {
+        const response = await apiFetch('/api/simulations', { signal });
+        const result = (await readApiJson(response)) as {
+          simulations?: SavedSimulation[];
+          error?: string;
+        };
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? 'Não foi possível carregar seus cenários.',
+          );
+        }
+        if (signal.aborted) return;
+        setSavedSimulations(result.simulations ?? []);
+      } catch (requestError) {
+        if (signal.aborted) return;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return;
+        }
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Não foi possível carregar seus cenários.',
         );
+        setSavedLoadFailed(true);
+      } finally {
+        if (!signal?.aborted) setSavedLoading(false);
       }
-      setSavedSimulations(result.simulations ?? []);
-    } catch (requestError) {
-      if (
-        requestError instanceof DOMException &&
-        requestError.name === 'AbortError'
-      ) {
-        return;
-      }
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Não foi possível carregar seus cenários.',
-      );
-    } finally {
-      if (!signal?.aborted) setSavedLoading(false);
-    }
-  }, []);
+    },
+    [beginSavedRequest],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -188,6 +196,7 @@ export function SimulationsPanel() {
   }, [loadSavedSimulations]);
 
   async function saveSimulation(type: SimulationType) {
+    if (savingType || !(type === 'debt' ? debtValid : investmentValid)) return;
     setSavingType(type);
     setMessage('');
     setError('');
@@ -210,12 +219,12 @@ export function SimulationsPanel() {
     const name = type === 'debt' ? debtScenarioName : investmentScenarioName;
 
     try {
-      const response = await fetch('/api/simulations', {
+      const response = await apiFetch('/api/simulations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ simulationType: type, name, input }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(result.error ?? 'Não foi possível salvar o cenário.');
       }
@@ -319,17 +328,32 @@ export function SimulationsPanel() {
               />
             </div>
 
+            {!debtValid && (
+              <p role="alert" className="text-sm text-red-200">
+                Informe uma fatura positiva, juros de 0 a 100% e de 1 a 120
+                meses. Valores que excedam a precisão dos cálculos não podem ser
+                simulados.
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <ResultCard
                 label="Dívida ao final"
-                value={formatCurrency(debtSimulation.finalAmountCents)}
+                value={
+                  debtValid
+                    ? formatCurrency(debtSimulation.finalAmountCents)
+                    : '—'
+                }
                 detail={`${debtMonths || '0'} meses sem pagamento`}
                 icon={<TrendingUp />}
                 danger
               />
               <ResultCard
                 label="Somente em juros"
-                value={formatCurrency(debtSimulation.totalInterestCents)}
+                value={
+                  debtValid
+                    ? formatCurrency(debtSimulation.totalInterestCents)
+                    : '—'
+                }
                 detail="Valor acima da fatura original"
                 icon={<TrendingDown />}
                 danger
@@ -348,6 +372,7 @@ export function SimulationsPanel() {
               name={debtScenarioName}
               onNameChange={setDebtScenarioName}
               saving={savingType === 'debt'}
+              disabled={!debtValid || savingType !== null}
               onSave={() => void saveSimulation('debt')}
             />
           </CardContent>
@@ -429,16 +454,32 @@ export function SimulationsPanel() {
               />
             </div>
 
+            {!investmentValid && (
+              <p role="alert" className="text-sm text-red-200">
+                Informe valores válidos, um valor inicial ou aporte positivo,
+                rendimento de 0 a 100% e prazo de até 600 meses (50 anos).
+                Valores que excedam a precisão dos cálculos não podem ser
+                simulados.
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-3">
               <ResultCard
                 label="Patrimônio projetado"
-                value={formatCurrency(investmentSimulation.finalAmountCents)}
+                value={
+                  investmentValid
+                    ? formatCurrency(investmentSimulation.finalAmountCents)
+                    : '—'
+                }
                 detail={`${totalMonths} meses de acumulação`}
                 icon={<TrendingUp />}
               />
               <ResultCard
                 label="Rendimento estimado"
-                value={formatCurrency(investmentSimulation.totalEarningsCents)}
+                value={
+                  investmentValid
+                    ? formatCurrency(investmentSimulation.totalEarningsCents)
+                    : '—'
+                }
                 detail="Além do dinheiro aportado"
                 icon={<PiggyBank />}
               />
@@ -448,7 +489,11 @@ export function SimulationsPanel() {
                     ? 'Sobra após o objetivo'
                     : 'Falta para o objetivo'
                 }
-                value={formatCurrency(Math.abs(comparisonCents))}
+                value={
+                  investmentValid
+                    ? formatCurrency(Math.abs(comparisonCents))
+                    : '—'
+                }
                 detail={goalName || 'Gasto futuro'}
                 icon={<Target />}
                 danger={comparisonCents < 0}
@@ -456,7 +501,7 @@ export function SimulationsPanel() {
             </div>
 
             <CurveChart
-              points={investmentSimulation.points}
+              points={investmentValid ? investmentSimulation.points : []}
               label="Patrimônio projetado"
               color="#ffffff"
               targetCents={futureExpenseCents}
@@ -469,6 +514,7 @@ export function SimulationsPanel() {
               name={investmentScenarioName}
               onNameChange={setInvestmentScenarioName}
               saving={savingType === 'investment'}
+              disabled={!investmentValid || savingType !== null}
               onSave={() => void saveSimulation('investment')}
             />
           </CardContent>
@@ -505,6 +551,13 @@ export function SimulationsPanel() {
               <div className="grid h-28 place-items-center text-muted-foreground">
                 <LoaderCircle className="size-7 animate-spin" />
               </div>
+            ) : savedLoadFailed ? (
+              <Button
+                variant="outline"
+                onClick={() => void loadSavedSimulations()}
+              >
+                Tentar carregar cenários novamente
+              </Button>
             ) : savedSimulations.length === 0 ? (
               <div className="grid min-h-28 place-items-center text-center">
                 <div>
@@ -667,25 +720,17 @@ function CurveChart({
   ariaLabel: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [chartError, setChartError] = useState('');
 
   useEffect(() => {
     let active = true;
     let chart: ChartInstance | undefined;
+    if (points.length === 0) return;
 
-    void import('chart.js').then(
-      ({
-        Chart,
-        LineController,
-        LineElement,
-        PointElement,
-        LinearScale,
-        CategoryScale,
-        Tooltip,
-        Legend,
-        Filler,
-      }) => {
-        if (!active || !canvasRef.current) return;
-        Chart.register(
+    void import('chart.js')
+      .then(
+        ({
+          Chart,
           LineController,
           LineElement,
           PointElement,
@@ -694,78 +739,100 @@ function CurveChart({
           Tooltip,
           Legend,
           Filler,
-        );
-        const datasets = [
-          {
-            label,
-            data: points.map((point) => point.valueCents),
-            borderColor: color,
-            backgroundColor: `${color}22`,
-            borderWidth: 3,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.28,
-            fill: true,
-          },
-        ];
+        }) => {
+          if (!active || !canvasRef.current) return;
+          setChartError('');
+          Chart.register(
+            LineController,
+            LineElement,
+            PointElement,
+            LinearScale,
+            CategoryScale,
+            Tooltip,
+            Legend,
+            Filler,
+          );
+          const datasets = [
+            {
+              label,
+              data: points.map((point) => point.valueCents),
+              borderColor: color,
+              backgroundColor: `${color}22`,
+              borderWidth: 3,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.28,
+              fill: true,
+            },
+          ];
 
-        if (targetCents !== undefined && targetCents > 0) {
-          datasets.push({
-            label: targetLabel ?? 'Gasto futuro',
-            data: points.map(() => targetCents),
-            borderColor: '#EEE6DB',
-            backgroundColor: '#EEE6DB11',
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            tension: 0,
-            fill: false,
-            borderDash: [7, 5],
-          } as (typeof datasets)[number]);
-        }
+          if (targetCents !== undefined && targetCents > 0) {
+            datasets.push({
+              label: targetLabel ?? 'Gasto futuro',
+              data: points.map(() => targetCents),
+              borderColor: '#EEE6DB',
+              backgroundColor: '#EEE6DB11',
+              borderWidth: 2,
+              pointRadius: 0,
+              pointHoverRadius: 0,
+              tension: 0,
+              fill: false,
+              borderDash: [7, 5],
+            } as (typeof datasets)[number]);
+          }
 
-        chart = new Chart(canvasRef.current, {
-          type: 'line',
-          data: {
-            labels: points.map((point) =>
-              point.month === 0 ? 'Hoje' : `Mês ${point.month}`,
-            ),
-            datasets,
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: { duration: 220 },
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-              legend: {
-                labels: { color: '#EEE6DB', usePointStyle: true, boxWidth: 8 },
+          chart = new Chart(canvasRef.current, {
+            type: 'line',
+            data: {
+              labels: points.map((point) =>
+                point.month === 0 ? 'Hoje' : `Mês ${point.month}`,
+              ),
+              datasets,
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 220 },
+              interaction: { intersect: false, mode: 'index' },
+              plugins: {
+                legend: {
+                  labels: {
+                    color: '#EEE6DB',
+                    usePointStyle: true,
+                    boxWidth: 8,
+                  },
+                },
+                tooltip: {
+                  callbacks: {
+                    label: (context) =>
+                      `${context.dataset.label}: ${formatCurrency(Number(context.raw))}`,
+                  },
+                },
               },
-              tooltip: {
-                callbacks: {
-                  label: (context) =>
-                    `${context.dataset.label}: ${formatCurrency(Number(context.raw))}`,
+              scales: {
+                x: {
+                  grid: { color: 'rgba(255,255,255,.05)' },
+                  ticks: { color: '#BFC7D3', maxTicksLimit: 7 },
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: { color: 'rgba(255,255,255,.08)' },
+                  ticks: {
+                    color: '#BFC7D3',
+                    callback: (value) => formatCurrency(Number(value)),
+                  },
                 },
               },
             },
-            scales: {
-              x: {
-                grid: { color: 'rgba(255,255,255,.05)' },
-                ticks: { color: '#BFC7D3', maxTicksLimit: 7 },
-              },
-              y: {
-                beginAtZero: true,
-                grid: { color: 'rgba(255,255,255,.08)' },
-                ticks: {
-                  color: '#BFC7D3',
-                  callback: (value) => formatCurrency(Number(value)),
-                },
-              },
-            },
-          },
-        });
-      },
-    );
+          });
+        },
+      )
+      .catch(() => {
+        if (active)
+          setChartError(
+            'Não foi possível abrir o gráfico. Recarregue a página.',
+          );
+      });
 
     return () => {
       active = false;
@@ -778,7 +845,19 @@ function CurveChart({
       aria-label={ariaLabel}
       className="h-64 rounded-xl border border-white/10 bg-[#18243F] p-3"
     >
-      <canvas ref={canvasRef}>{ariaLabel}</canvas>
+      {points.length === 0 ? (
+        <output
+          aria-live="polite"
+          className="grid h-full place-items-center text-center text-sm text-muted-foreground"
+        >
+          Preencha valores válidos para visualizar o gráfico.
+        </output>
+      ) : (
+        <>
+          <canvas ref={canvasRef}>{ariaLabel}</canvas>
+          {chartError && <p role="alert">{chartError}</p>}
+        </>
+      )}
     </figure>
   );
 }
@@ -788,12 +867,14 @@ function SaveScenario({
   name,
   onNameChange,
   saving,
+  disabled,
   onSave,
 }: {
   inputId: string;
   name: string;
   onNameChange: (value: string) => void;
   saving: boolean;
+  disabled: boolean;
   onSave: () => void;
 }) {
   return (
@@ -810,7 +891,7 @@ function SaveScenario({
       </div>
       <Button
         type="button"
-        disabled={saving || name.trim().length < 2}
+        disabled={disabled || name.trim().length < 2}
         onClick={onSave}
         className="bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
       >

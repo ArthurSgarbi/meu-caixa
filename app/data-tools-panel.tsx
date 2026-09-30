@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch, readApiJson } from '@/lib/client-api';
 
 import { useState } from 'react';
 import {
@@ -49,11 +50,11 @@ export function DataToolsPanel({
     setError('');
     setMessage('');
     try {
-      const response = await fetch(`/api/data-export?format=${format}`, {
+      const response = await apiFetch(`/api/data-export?format=${format}`, {
         cache: 'no-store',
       });
       if (!response.ok) {
-        const result = (await response.json()) as { error?: string };
+        const result = (await readApiJson(response)) as { error?: string };
         throw new Error(result.error ?? 'Não foi possível exportar os dados.');
       }
       const blob = await response.blob();
@@ -92,12 +93,14 @@ export function DataToolsPanel({
     setBusy(true);
     try {
       const raw = await file.text();
-      const response = await fetch('/api/data-restore?mode=preview', {
+      const response = await apiFetch('/api/data-restore?mode=preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: raw,
       });
-      const result = (await response.json()) as Preview & { error?: string };
+      const result = (await readApiJson(response)) as Preview & {
+        error?: string;
+      };
       if (!response.ok) throw new Error(result.error ?? 'Backup inválido.');
       setRawBackup(raw);
       setFileName(file.name);
@@ -125,12 +128,12 @@ export function DataToolsPanel({
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/data-restore?mode=restore', {
+      const response = await apiFetch('/api/data-restore?mode=restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: rawBackup,
       });
-      const result = (await response.json()) as {
+      const result = (await readApiJson(response)) as {
         error?: string;
         totalMissing?: number;
       };
@@ -196,7 +199,11 @@ export function DataToolsPanel({
               type="file"
               accept=".json,application/json"
               disabled={busy}
-              onChange={(event) => void inspect(event.target.files?.[0])}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                void inspect(file);
+              }}
             />
             <p className="text-xs text-muted-foreground">
               Até 2 MB e 2.000 registros. O arquivo deve ser da mesma conta. A

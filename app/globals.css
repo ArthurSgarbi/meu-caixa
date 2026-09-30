@@ -94,6 +94,7 @@ body {
 }
 
 .brand-luxe {
+  overflow-wrap: anywhere;
   background-color: var(--velvet);
   background-image:
     radial-gradient(circle at 4% 2%, rgb(210 181 137 / 18%), transparent 34%),

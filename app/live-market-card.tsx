@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -81,6 +83,8 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
   const [selectedTicker, setSelectedTicker] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const beginMarketRequest = useLatestRequest();
 
   const assetKey = assets
     .map((asset) => `${asset.ticker}:${asset.quantity}`)
@@ -98,46 +102,57 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
     return result;
   }, [assets]);
 
-  const loadMarketData = useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    try {
-      const response = await fetch('/api/market-data', {
-        cache: 'no-store',
-        signal,
-      });
-      const result = (await response.json()) as MarketResponse;
-      if (!response.ok) {
-        throw new Error(
-          result.error ?? 'Não foi possível carregar as cotações.',
-        );
-      }
+  const loadMarketData = useCallback(
+    async (signal?: AbortSignal) => {
+      signal = beginMarketRequest(signal).signal;
+      if (signal.aborted) return false;
+      setLoading(true);
+      try {
+        const response = await apiFetch('/api/market-data', {
+          cache: 'no-store',
+          signal,
+        });
+        const result = (await readApiJson(response)) as MarketResponse;
+        if (!response.ok) {
+          throw new Error(
+            result.error ?? 'Não foi possível carregar as cotações.',
+          );
+        }
 
-      const nextData = result as MarketData;
-      setMarketData(nextData);
-      setSelectedTicker((current) =>
-        nextData.quotes.some((quote) => quote.ticker === current)
-          ? current
-          : (nextData.quotes[0]?.ticker ?? ''),
-      );
-      setError('');
-      return nextData.marketOpen;
-    } catch (requestError) {
-      if (
-        requestError instanceof DOMException &&
-        requestError.name === 'AbortError'
-      ) {
+        const nextData = result as MarketData;
+        if (!Array.isArray(nextData.quotes))
+          throw new Error(
+            'As cotações recebidas são inválidas. Tente novamente.',
+          );
+        if (signal.aborted) return false;
+        setMarketData(nextData);
+        setSelectedTicker((current) =>
+          nextData.quotes.some((quote) => quote.ticker === current)
+            ? current
+            : (nextData.quotes[0]?.ticker ?? ''),
+        );
+        setError('');
+        return nextData.marketOpen;
+      } catch (requestError) {
+        if (signal.aborted) return false;
+        if (
+          requestError instanceof DOMException &&
+          requestError.name === 'AbortError'
+        ) {
+          return false;
+        }
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Não foi possível carregar as cotações.',
+        );
         return false;
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : 'Não foi possível carregar as cotações.',
-      );
-      return false;
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
+    },
+    [beginMarketRequest],
+  );
 
   useEffect(() => {
     if (!assetKey) {
@@ -146,11 +161,14 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
 
     const controller = new AbortController();
     let timer: number | undefined;
+    let refreshing = false;
 
     const scheduleRefresh = async () => {
-      if (document.hidden || controller.signal.aborted) return;
+      if (document.hidden || controller.signal.aborted || refreshing) return;
+      refreshing = true;
       const marketOpen = await loadMarketData(controller.signal);
-      if (controller.signal.aborted) return;
+      refreshing = false;
+      if (controller.signal.aborted || document.hidden) return;
       timer = window.setTimeout(
         scheduleRefresh,
         marketOpen ? 60_000 : 15 * 60_000,
@@ -169,30 +187,36 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
       if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [assetKey, loadMarketData]);
+  }, [assetKey, loadMarketData, refreshVersion]);
 
-  const selectedQuote = marketData?.quotes.find(
-    (quote) => quote.ticker === selectedTicker,
+  const quotes = useMemo(
+    () =>
+      (marketData?.quotes ?? []).filter((quote) =>
+        quantities.has(quote.ticker),
+      ),
+    [marketData?.quotes, quantities],
   );
-  const selectedQuoteIndex = marketData?.quotes.findIndex(
-    (quote) => quote.ticker === selectedTicker,
-  ) ?? -1;
+  const selectedQuote =
+    quotes.find((quote) => quote.ticker === selectedTicker) ?? quotes[0];
+  const selectedQuoteIndex = quotes.findIndex(
+    (quote) => quote.ticker === selectedQuote?.ticker,
+  );
 
   const moveCarousel = (direction: -1 | 1) => {
-    const quotes = marketData?.quotes ?? [];
     if (quotes.length === 0) return;
     const currentIndex = selectedQuoteIndex >= 0 ? selectedQuoteIndex : 0;
-    const nextIndex = (currentIndex + direction + quotes.length) % quotes.length;
+    const nextIndex =
+      (currentIndex + direction + quotes.length) % quotes.length;
     setSelectedTicker(quotes[nextIndex].ticker);
   };
   const livePortfolioValue = useMemo(
     () =>
-      (marketData?.quotes ?? []).reduce(
+      quotes.reduce(
         (total, quote) =>
           total + quote.price * (quantities.get(quote.ticker) ?? 0),
         0,
       ),
-    [marketData?.quotes, quantities],
+    [quotes, quantities],
   );
 
   if (assets.length === 0) {
@@ -241,9 +265,11 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                 marketData?.marketOpen ? 'bg-emerald-400' : 'bg-white/40'
               }`}
             />
-            {marketData?.marketOpen
-              ? 'Pregão aberto · 1 min'
-              : 'Mercado fechado · pausado'}
+            {!marketData
+              ? 'Consultando pregão...'
+              : marketData.marketOpen
+                ? 'Pregão aberto · 1 min'
+                : 'Mercado fechado · pausado'}
           </Badge>
           <Button
             type="button"
@@ -251,7 +277,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
             size="icon-sm"
             aria-label="Atualizar cotações agora"
             disabled={loading}
-            onClick={() => void loadMarketData()}
+            onClick={() => setRefreshVersion((version) => version + 1)}
           >
             {loading ? (
               <LoaderCircle className="animate-spin" />
@@ -275,10 +301,14 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
               Patrimônio acompanhado pela bolsa
             </p>
             <p className="mt-1 text-2xl font-bold tabular-nums">
-              {currencyFormatter.format(livePortfolioValue)}
+              {quotes.length
+                ? currencyFormatter.format(livePortfolioValue)
+                : '—'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Calculado por preço × quantidade dos ativos com ticker.
+              {quotes.length < quantities.size &&
+                ` Cotação disponível para ${quotes.length} de ${quantities.size} ativos.`}
             </p>
           </div>
           <div className="space-y-2">
@@ -287,11 +317,12 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
             </label>
             <NativeSelect
               id="live-market-ticker"
-              value={selectedTicker}
+              value={selectedQuote?.ticker ?? ''}
+              disabled={!quotes.length}
               onChange={(event) => setSelectedTicker(event.target.value)}
               className="w-full"
             >
-              {(marketData?.quotes ?? []).map((quote) => (
+              {quotes.map((quote) => (
                 <NativeSelectOption key={quote.ticker} value={quote.ticker}>
                   {quote.ticker} · {quote.name}
                 </NativeSelectOption>
@@ -300,7 +331,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
           </div>
         </div>
 
-        {marketData?.quotes.length ? (
+        {quotes.length ? (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
             <Button
               type="button"
@@ -308,20 +339,22 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
               size="icon-sm"
               aria-label="Ver ação anterior"
               onClick={() => moveCarousel(-1)}
-              disabled={marketData.quotes.length < 2}
+              disabled={quotes.length < 2}
             >
               <ChevronLeft />
             </Button>
             <div
-              className="flex min-w-0 flex-1 items-center justify-center gap-1.5"
+              className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-1.5"
               aria-label="Navegação dos gráficos por ação"
             >
-              {marketData.quotes.map((quote, index) => (
+              {quotes.map((quote, index) => (
                 <button
                   key={quote.ticker}
                   type="button"
                   aria-label={`Ver gráfico de ${quote.ticker}`}
-                  aria-current={index === selectedQuoteIndex ? 'true' : undefined}
+                  aria-current={
+                    index === selectedQuoteIndex ? 'true' : undefined
+                  }
                   onClick={() => setSelectedTicker(quote.ticker)}
                   className={`h-2 rounded-full transition-all ${
                     index === selectedQuoteIndex
@@ -332,7 +365,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
               ))}
             </div>
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-              {selectedQuoteIndex + 1}/{marketData.quotes.length}
+              {selectedQuoteIndex + 1}/{quotes.length}
             </span>
             <Button
               type="button"
@@ -340,7 +373,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
               size="icon-sm"
               aria-label="Ver próxima ação"
               onClick={() => moveCarousel(1)}
-              disabled={marketData.quotes.length < 2}
+              disabled={quotes.length < 2}
             >
               <ChevronRight />
             </Button>

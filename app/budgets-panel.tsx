@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import {
   SyntheticEvent,
@@ -57,19 +59,27 @@ export function BudgetsPanel({
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [message, setMessage] = useState('');
 
+  const beginBudgetsRequest = useLatestRequest();
   const loadBudgets = useCallback(
     async (signal?: AbortSignal) => {
+      signal = beginBudgetsRequest(signal).signal;
+      if (signal.aborted) return false;
       setLoading(true);
+      setLoadFailed(false);
       setError('');
       try {
-        const response = await fetch(`/api/budgets?month=${month}`, { signal });
-        const result = (await response.json()) as BudgetsResponse;
+        const response = await apiFetch(`/api/budgets?month=${month}`, {
+          signal,
+        });
+        const result = (await readApiJson(response)) as BudgetsResponse;
         if (!response.ok)
           throw new Error(
             result.error ?? 'Não foi possível carregar os orçamentos.',
           );
+        if (signal.aborted) return false;
         setCategories(
           result.categories.map((category) => ({
             categoryId: Number(category.categoryId),
@@ -81,11 +91,13 @@ export function BudgetsPanel({
         );
         return true;
       } catch (requestError) {
+        if (signal.aborted) return false;
         if (
           requestError instanceof DOMException &&
           requestError.name === 'AbortError'
         )
           return false;
+        setLoadFailed(true);
         setError(
           requestError instanceof Error
             ? requestError.message
@@ -96,7 +108,7 @@ export function BudgetsPanel({
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [month],
+    [month, beginBudgetsRequest],
   );
 
   useEffect(() => {
@@ -132,7 +144,7 @@ export function BudgetsPanel({
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/budgets', {
+      const response = await apiFetch('/api/budgets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -141,7 +153,7 @@ export function BudgetsPanel({
           limitCents,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok)
         throw new Error(result.error ?? 'Não foi possível salvar o orçamento.');
       if (await loadBudgets()) setMessage('Limite mensal salvo.');
@@ -167,12 +179,12 @@ export function BudgetsPanel({
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/budgets', {
+      const response = await apiFetch('/api/budgets', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ month, categoryId: category.categoryId }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok)
         throw new Error(
           result.error ?? 'Não foi possível remover o orçamento.',
@@ -259,7 +271,9 @@ export function BudgetsPanel({
             </div>
             <Button
               type="submit"
-              disabled={saving || loading || !currentCategoryId}
+              disabled={
+                saving || loading || removingId !== null || !currentCategoryId
+              }
               className="h-11"
             >
               {saving && <LoaderCircle className="animate-spin" />}
@@ -282,6 +296,10 @@ export function BudgetsPanel({
               <LoaderCircle className="size-4 animate-spin" /> Carregando
               orçamentos...
             </div>
+          ) : loadFailed ? (
+            <Button variant="outline" onClick={() => void loadBudgets()}>
+              Tentar carregar orçamentos novamente
+            </Button>
           ) : activeBudgets.length === 0 ? (
             <p className="rounded-lg border border-dashed border-white/20 p-5 text-sm text-muted-foreground">
               Nenhum limite definido para este mês. Escolha uma categoria acima
@@ -347,7 +365,7 @@ export function BudgetsPanel({
                         size="sm"
                         variant="ghost"
                         onClick={() => void removeBudget(category)}
-                        disabled={removingId === category.categoryId}
+                        disabled={removingId !== null || saving || loading}
                         aria-label={`Remover orçamento de ${category.categoryName}`}
                       >
                         {removingId === category.categoryId ? (

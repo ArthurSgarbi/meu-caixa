@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import {
   SyntheticEvent,
@@ -72,6 +74,7 @@ export function RecurringPanel({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
   const [message, setMessage] = useState('');
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [categoryId, setCategoryId] = useState('');
@@ -90,24 +93,31 @@ export function RecurringPanel({
     ? categoryId
     : String(matchingCategories[0]?.id ?? '');
 
+  const beginRecurringRequest = useLatestRequest();
   const load = useCallback(
     async (signal?: AbortSignal) => {
+      signal = beginRecurringRequest(signal).signal;
+      if (signal.aborted) return false;
       setLoading(true);
+      setLoadFailed(false);
       setError('');
       try {
-        const response = await fetch(`/api/recurring?month=${month}`, {
+        const response = await apiFetch(`/api/recurring?month=${month}`, {
           signal,
         });
-        const result = (await response.json()) as RecurringResponse;
+        const result = (await readApiJson(response)) as RecurringResponse;
         if (!response.ok)
           throw new Error(
             result.error ?? 'Não foi possível carregar as recorrências.',
           );
+        if (signal.aborted) return false;
         setData(result);
         return true;
       } catch (cause) {
+        if (signal.aborted) return false;
         if (cause instanceof DOMException && cause.name === 'AbortError')
           return false;
+        setLoadFailed(true);
         setError(
           cause instanceof Error
             ? cause.message
@@ -118,7 +128,7 @@ export function RecurringPanel({
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [month],
+    [month, beginRecurringRequest],
   );
 
   useEffect(() => {
@@ -139,12 +149,12 @@ export function RecurringPanel({
     setError('');
     setMessage('');
     try {
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok)
         throw new Error(
           result.error ?? 'Não foi possível concluir a operação.',
@@ -328,6 +338,10 @@ export function RecurringPanel({
               <LoaderCircle className="size-4 animate-spin" /> Carregando
               previsões...
             </p>
+          ) : loadFailed ? (
+            <Button variant="outline" onClick={() => void load()}>
+              Tentar carregar previsões novamente
+            </Button>
           ) : (
             <>
               <div className="space-y-3">

@@ -1,4 +1,7 @@
 'use client';
+import { parseCurrencyToCents } from '@/lib/frontend-input';
+import { apiFetch, readApiJson } from '@/lib/client-api';
+import { useLatestRequest } from '@/hooks/use-latest-request';
 
 import {
   ReactNode,
@@ -138,17 +141,6 @@ function formatDate(date: string) {
   return dateFormatter.format(new Date(`${date}T00:00:00Z`));
 }
 
-function parseCurrencyToCents(value: string) {
-  const normalized = value.includes(',')
-    ? value
-        .replace(/[^\d,-]/g, '')
-        .replace(/\./g, '')
-        .replace(',', '.')
-    : value.replace(/[^\d.-]/g, '');
-  const amount = Number(normalized);
-  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
-}
-
 function formString(value: FormDataEntryValue | null) {
   return typeof value === 'string' ? value : '';
 }
@@ -163,19 +155,24 @@ export function CreditCardsPanel() {
   const [newCardOpen, setNewCardOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
+  const beginCardsRequest = useLatestRequest();
   const loadCards = useCallback(
     async (signal?: AbortSignal) => {
+      signal = beginCardsRequest(signal).signal;
+      if (signal.aborted) return;
       setLoading(true);
+      setLoadError('');
       setError('');
       const params = new URLSearchParams({ month: selectedMonth });
       if (selectedCardId) params.set('cardId', selectedCardId);
 
       try {
-        const response = await fetch(`/api/credit-cards?${params}`, {
+        const response = await apiFetch(`/api/credit-cards?${params}`, {
           signal,
         });
-        const result = (await response.json()) as CreditCardsResponse & {
+        const result = (await readApiJson(response)) as CreditCardsResponse & {
           error?: string;
         };
         if (!response.ok) {
@@ -183,27 +180,30 @@ export function CreditCardsPanel() {
             result.error ?? 'Não foi possível carregar seus cartões.',
           );
         }
+        if (signal.aborted) return;
         setData(result);
         if (!selectedCardId && result.selectedCard) {
           setSelectedCardId(String(result.selectedCard.id));
         }
       } catch (requestError) {
+        if (signal.aborted) return;
         if (
           requestError instanceof DOMException &&
           requestError.name === 'AbortError'
         ) {
           return;
         }
-        setError(
+        const failure =
           requestError instanceof Error
             ? requestError.message
-            : 'Não foi possível carregar seus cartões.',
-        );
+            : 'Não foi possível carregar seus cartões.';
+        setError(failure);
+        setLoadError(failure);
       } finally {
         if (!signal?.aborted) setLoading(false);
       }
     },
-    [selectedCardId, selectedMonth],
+    [selectedCardId, selectedMonth, beginCardsRequest],
   );
 
   useEffect(() => {
@@ -230,11 +230,18 @@ export function CreditCardsPanel() {
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const creditLimitCents = parseCurrencyToCents(
+      formString(form.get('creditLimit')),
+    );
+    if (!Number.isSafeInteger(creditLimitCents) || creditLimitCents <= 0) {
+      setError('Informe um limite válido maior que zero.');
+      return;
+    }
     setSaving(true);
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/credit-cards', {
+      const response = await apiFetch('/api/credit-cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -242,14 +249,12 @@ export function CreditCardsPanel() {
           name: formString(form.get('cardName')),
           brand: formString(form.get('brand')),
           lastFour: formString(form.get('lastFour')),
-          creditLimitCents: parseCurrencyToCents(
-            formString(form.get('creditLimit')),
-          ),
+          creditLimitCents,
           closingDay: Number(formString(form.get('closingDay'))),
           dueDay: Number(formString(form.get('dueDay'))),
         }),
       });
-      const result = (await response.json()) as {
+      const result = (await readApiJson(response)) as {
         id?: number;
         error?: string;
       };
@@ -276,25 +281,40 @@ export function CreditCardsPanel() {
     if (!data.selectedCard) return;
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
+    const totalAmountCents = parseCurrencyToCents(
+      formString(form.get('amount')),
+    );
+    const installmentCount = Number(formString(form.get('installmentCount')));
+    if (
+      !Number.isSafeInteger(totalAmountCents) ||
+      totalAmountCents <= 0 ||
+      !Number.isInteger(installmentCount) ||
+      installmentCount < 1 ||
+      installmentCount > 36 ||
+      installmentCount > totalAmountCents
+    ) {
+      setError(
+        'Informe um valor positivo e de 1 a 36 parcelas de pelo menos R$ 0,01.',
+      );
+      return;
+    }
     setSaving(true);
     setError('');
     setMessage('');
     try {
-      const response = await fetch('/api/credit-cards', {
+      const response = await apiFetch('/api/credit-cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'create_purchase',
           cardId: data.selectedCard.id,
           description: formString(form.get('description')),
-          totalAmountCents: parseCurrencyToCents(
-            formString(form.get('amount')),
-          ),
+          totalAmountCents,
           purchaseDate: formString(form.get('purchaseDate')),
-          installmentCount: Number(formString(form.get('installmentCount'))),
+          installmentCount,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(result.error ?? 'Não foi possível registrar a compra.');
       }
@@ -319,7 +339,7 @@ export function CreditCardsPanel() {
     setMessage('');
     const nextStatus = data.invoice.status === 'paid' ? 'open' : 'paid';
     try {
-      const response = await fetch('/api/credit-cards', {
+      const response = await apiFetch('/api/credit-cards', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -327,7 +347,7 @@ export function CreditCardsPanel() {
           status: nextStatus,
         }),
       });
-      const result = (await response.json()) as { error?: string };
+      const result = (await readApiJson(response)) as { error?: string };
       if (!response.ok) {
         throw new Error(result.error ?? 'Não foi possível atualizar a fatura.');
       }
@@ -366,6 +386,7 @@ export function CreditCardsPanel() {
                 <NativeSelect
                   aria-label="Selecionar cartão"
                   value={selectedCardId}
+                  disabled={saving || invoiceSaving}
                   onChange={(event) => setSelectedCardId(event.target.value)}
                   className="min-w-48 border-white/15 bg-[#212F52]/90 text-white"
                 >
@@ -390,7 +411,22 @@ export function CreditCardsPanel() {
             </div>
           </div>
 
-          {data.selectedCard ? (
+          {loading ? (
+            <output aria-live="polite" className="flex items-center gap-2 py-8">
+              <LoaderCircle className="size-5 animate-spin" /> Carregando
+              cartões e faturas...
+            </output>
+          ) : loadError ? (
+            <div
+              role="alert"
+              className="space-y-3 rounded-xl bg-red-950/70 p-4 text-red-200"
+            >
+              <p>{loadError}</p>
+              <Button variant="outline" onClick={() => void loadCards()}>
+                Tentar novamente
+              </Button>
+            </div>
+          ) : data.selectedCard ? (
             <>
               <div className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
@@ -457,7 +493,7 @@ export function CreditCardsPanel() {
         </div>
       </header>
 
-      {data.selectedCard && (
+      {data.selectedCard && !loading && !loadError && (
         <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
           <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
             <CardHeader className="border-b border-white/10 pb-4">
@@ -564,6 +600,7 @@ export function CreditCardsPanel() {
                 <NativeSelect
                   aria-label="Selecionar mês da fatura"
                   value={selectedMonth}
+                  disabled={saving || invoiceSaving}
                   onChange={(event) => setSelectedMonth(event.target.value)}
                   className="w-full sm:w-52"
                 >
@@ -606,6 +643,7 @@ export function CreditCardsPanel() {
                     disabled={
                       !data.invoice?.id ||
                       data.summary.invoiceCents === 0 ||
+                      loading ||
                       invoiceSaving
                     }
                     onClick={() => void toggleInvoicePayment()}
