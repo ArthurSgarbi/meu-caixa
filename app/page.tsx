@@ -621,31 +621,31 @@ export default function Home() {
               <TabsList className="h-auto min-w-0 flex-1 flex-nowrap justify-start overflow-x-auto rounded-xl border border-white/15 bg-[#212F52]/80 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 <TabsTrigger
                   value="expenses"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
                 >
                   <ReceiptText /> Gastos
                 </TabsTrigger>
                 <TabsTrigger
                   value="investments"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
                 >
                   <PiggyBank /> Investimentos
                 </TabsTrigger>
                 <TabsTrigger
                   value="credit-cards"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
                 >
                   <CreditCard /> Cartões
                 </TabsTrigger>
                 <TabsTrigger
                   value="simulations"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
                 >
                   <ChartNoAxesCombined /> Simulações
                 </TabsTrigger>
                 <TabsTrigger
                   value="assistant"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
                 >
                   <Bot /> Assistente IA
                 </TabsTrigger>
