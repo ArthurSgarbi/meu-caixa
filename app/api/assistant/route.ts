@@ -1,6 +1,10 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb, type Database } from '@/db';
 import { calculateMonthlyAccountChangeCents } from '@/lib/finance-calculations';
+import {
+  currentMonthInBrazil,
+  getMonthRange,
+} from '@/lib/finance-month';
 import { ASSISTANT_SYSTEM_PROMPT } from '@/lib/assistant-system-prompt';
 
 export const dynamic = 'force-dynamic';
@@ -26,14 +30,11 @@ const MAX_HISTORY_MESSAGE_LENGTH = 1_000;
 // Modelo sem etapa de raciocínio separada: a API retorna o texto em result.response.
 const WORKERS_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 
-function getMonthRange() {
-  const month = new Date().toISOString().slice(0, 7);
-  const [year, monthNumber] = month.split('-').map(Number);
-  const start = `${month}-01`;
-  const next = new Date(Date.UTC(year, monthNumber, 1))
-    .toISOString()
-    .slice(0, 10);
-  return { month, start, next };
+function getCurrentMonthRange() {
+  const month = currentMonthInBrazil();
+  const range = getMonthRange(month);
+  if (!range) throw new Error('Invalid current month');
+  return { month, ...range };
 }
 
 function parseHistory(value: unknown): ChatMessage[] {
@@ -62,7 +63,7 @@ function extractOutputText(response: WorkersAIResponse) {
 }
 
 async function loadFinancialContext(db: Database, ownerId: string) {
-  const { month, start, next } = getMonthRange();
+  const { month, start, next } = getCurrentMonthRange();
 
   // Todas as consultas pessoais exigem owner_id. Essa é a barreira que impede
   // que a assistente misture os dados de contas diferentes.

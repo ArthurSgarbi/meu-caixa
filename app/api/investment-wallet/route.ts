@@ -148,32 +148,95 @@ export async function POST(request: Request) {
         .bind(user.userId, now, now),
     ]);
 
-    const [mainBalanceResult, category, wallet] = await Promise.all([
+    const category = await db
+      .prepare(
+        `SELECT id FROM categories
+          WHERE slug = 'investimentos' AND type = 'expense'`,
+      )
+      .first();
+    if (!category?.id) {
+      throw new Error('Investment transfer dependencies unavailable');
+    }
+
+    // O bloqueio da carteira serializa aportes da mesma pessoa. A consulta de
+    // saldo acontece no comando seguinte, já dentro da MESMA transação: um
+    // segundo aporte aguardará o primeiro e enxergará o débito recém-gravado.
+    const [walletLock, transfer] = await db.batch([
       db
         .prepare(
-          `SELECT COALESCE(
-              SUM(CASE WHEN type = 'income' THEN amount_cents
-                       ELSE -amount_cents END), 0
-            ) AS balanceCents
-             FROM transactions
-            WHERE owner_id = ?`,
+          `SELECT id FROM investment_wallets
+            WHERE owner_id = ? FOR UPDATE`,
         )
-        .bind(user.userId)
-        .first(),
+        .bind(user.userId),
       db
         .prepare(
-          `SELECT id FROM categories
-            WHERE slug = 'investimentos' AND type = 'expense'`,
+          `WITH available AS (
+             SELECT COALESCE(
+               SUM(CASE WHEN type = 'income' THEN amount_cents
+                        ELSE -amount_cents END), 0
+             ) AS balance_cents
+               FROM transactions WHERE owner_id = ?
+           ), transferred AS (
+             INSERT INTO transactions
+               (description, type, amount_cents, transaction_date,
+                category_id, owner_id, created_at)
+             SELECT ?, 'transfer', ?, ?, ?, ?, ?
+               FROM investment_wallets w CROSS JOIN available a
+              WHERE w.owner_id = ? AND a.balance_cents >= ?
+             RETURNING owner_id
+           ), credited AS (
+             UPDATE investment_wallets w
+                SET balance_cents = w.balance_cents + ?, updated_at = ?
+              WHERE w.owner_id = ?
+                AND EXISTS (SELECT 1 FROM transferred t
+                             WHERE t.owner_id = w.owner_id)
+             RETURNING w.id, w.owner_id
+           ), contributed AS (
+             INSERT INTO investment_contributions
+               (wallet_id, owner_id, description, amount_cents,
+                contribution_date, created_at)
+             SELECT c.id, c.owner_id, ?, ?, ?, ? FROM credited c
+             RETURNING id
+           )
+           SELECT id FROM contributed`,
         )
-        .first(),
-      db
-        .prepare('SELECT id FROM investment_wallets WHERE owner_id = ?')
-        .bind(user.userId)
-        .first(),
+        .bind(
+          user.userId,
+          `Investimento: ${description}`,
+          amountCents,
+          contributionDate,
+          Number(category.id),
+          user.userId,
+          now,
+          user.userId,
+          amountCents,
+          amountCents,
+          now,
+          user.userId,
+          description,
+          amountCents,
+          contributionDate,
+          now,
+        ),
     ]);
 
+    if (walletLock.meta.changes !== 1) {
+      throw new Error('Investment wallet unavailable during transfer');
+    }
+
+    const mainBalanceResult = await db
+      .prepare(
+        `SELECT COALESCE(
+            SUM(CASE WHEN type = 'income' THEN amount_cents
+                     ELSE -amount_cents END), 0
+          ) AS balanceCents
+           FROM transactions WHERE owner_id = ?`,
+      )
+      .bind(user.userId)
+      .first();
     const mainBalanceCents = Number(mainBalanceResult?.balanceCents ?? 0);
-    if (amountCents > mainBalanceCents) {
+
+    if (transfer.meta.changes === 0) {
       return Response.json(
         {
           error: `Saldo insuficiente. Disponível: R$ ${(mainBalanceCents / 100)
@@ -183,56 +246,11 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    if (!category?.id || !wallet?.id) {
-      throw new Error('Investment transfer dependencies unavailable');
-    }
-
-    // As três operações formam uma única transferência financeira:
-    // registra a saída, credita a carteira e preserva o histórico do aporte.
-    await db.batch([
-      db
-        .prepare(
-          `INSERT INTO transactions
-            (description, type, amount_cents, transaction_date, category_id,
-             owner_id, created_at)
-           VALUES (?, 'transfer', ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          `Investimento: ${description}`,
-          amountCents,
-          contributionDate,
-          Number(category.id),
-          user.userId,
-          now,
-        ),
-      db
-        .prepare(
-          `UPDATE investment_wallets
-              SET balance_cents = balance_cents + ?, updated_at = ?
-            WHERE id = ? AND owner_id = ?`,
-        )
-        .bind(amountCents, now, Number(wallet.id), user.userId),
-      db
-        .prepare(
-          `INSERT INTO investment_contributions
-            (wallet_id, owner_id, description, amount_cents,
-             contribution_date, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(
-          Number(wallet.id),
-          user.userId,
-          description,
-          amountCents,
-          contributionDate,
-          now,
-        ),
-    ]);
 
     return Response.json(
       {
         transferredCents: amountCents,
-        mainBalanceCents: mainBalanceCents - amountCents,
+        mainBalanceCents,
       },
       { status: 201 },
     );

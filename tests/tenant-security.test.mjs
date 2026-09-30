@@ -74,33 +74,37 @@ function normalizeSql(query) {
 function inMemoryAdapter(pg) {
   function prepare(query, values = []) {
     const sqlText = normalizeSql(query);
+    async function runWith(client) {
+      const isInsert = /^\s*INSERT\b/i.test(sqlText);
+      const executable =
+        isInsert && !/\bRETURNING\b/i.test(sqlText)
+          ? `${sqlText.trim().replace(/;$/, '')} RETURNING id`
+          : sqlText;
+      const result = await client.query(executable, values);
+      return {
+        meta: {
+          changes: result.rows.length || result.affectedRows || 0,
+          last_row_id: Number(result.rows[0]?.id) || null,
+        },
+      };
+    }
     return {
       bind: (...params) => prepare(query, params),
       all: async () => ({ results: (await pg.query(sqlText, values)).rows }),
       first: async () => (await pg.query(sqlText, values)).rows[0] ?? null,
-      run: async () => {
-        const isInsert = /^\s*INSERT\b/i.test(sqlText);
-        const executable =
-          isInsert && !/\bRETURNING\b/i.test(sqlText)
-            ? `${sqlText.trim().replace(/;$/, '')} RETURNING id`
-            : sqlText;
-        const result = await pg.query(executable, values);
-        return {
-          meta: {
-            changes: result.affectedRows ?? result.rows.length,
-            last_row_id: Number(result.rows[0]?.id) || null,
-          },
-        };
-      },
+      run: () => runWith(pg),
+      runWith,
     };
   }
   return {
     prepare,
-    batch: async (statements) => {
+    batch: (statements) => pg.transaction(async (transaction) => {
       const results = [];
-      for (const statement of statements) results.push(await statement.run());
+      for (const statement of statements) {
+        results.push(await statement.runWith(transaction));
+      }
       return results;
-    },
+    }),
   };
 }
 
@@ -532,6 +536,33 @@ test('investment transfer does not become an expense or leak to another user', a
   currentOwner = 'test-owner-a';
   const ownWallet = await walletRoute.GET();
   assert.equal((await ownWallet.json()).wallet.balanceCents, 100_001);
+});
+
+test('two simultaneous contributions cannot both spend the same balance', async () => {
+  await createIncomeForA(10_000);
+  currentOwner = 'test-owner-a';
+  const contribution = (description) =>
+    walletRoute.POST(
+      jsonRequest('/api/investment-wallet', 'POST', {
+        amountCents: 7_000,
+        contributionDate: '2026-09-29',
+        description,
+      }),
+    );
+
+  const responses = await Promise.all([
+    contribution('Aporte paralelo 1'),
+    contribution('Aporte paralelo 2'),
+  ]);
+  assert.deepEqual(
+    responses.map((response) => response.status).sort((a, b) => a - b),
+    [201, 400],
+  );
+  const wallet = await walletRoute.GET();
+  const data = await wallet.json();
+  assert.equal(data.mainBalanceCents, 3_000);
+  assert.equal(data.wallet.balanceCents, 7_000);
+  assert.equal(data.contributions.length, 1);
 });
 
 test('CSV and JSON backups contain only the signed-in owner’s financial records', async () => {

@@ -55,6 +55,7 @@ import {
   NativeSelectOption,
 } from '@/components/ui/native-select';
 import { calculateDailyYield } from '@/lib/investment-calculations';
+import { todayInBrazil } from '@/lib/finance-month';
 import { LiveMarketCard } from './live-market-card';
 
 type Investment = {
@@ -191,14 +192,6 @@ function parsePercentage(value: string) {
 function parseDecimal(value: string) {
   const parsed = Number(value.trim().replace(',', '.'));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-}
-
-function localToday() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 export function InvestmentsPanel() {
@@ -857,7 +850,7 @@ export function InvestmentsPanel() {
                   name="acquisitionDate"
                   type="date"
                   required
-                  defaultValue={localToday()}
+                  defaultValue={todayInBrazil()}
                   className="h-11"
                 />
               </div>

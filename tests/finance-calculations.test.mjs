@@ -5,7 +5,11 @@ import {
   calculateMonthlyAccountChangeCents,
   parseBudgetLimitCents,
 } from '../lib/finance-calculations.ts';
-import { getMonthRange } from '../lib/finance-month.ts';
+import {
+  currentMonthInBrazil,
+  getMonthRange,
+  todayInBrazil,
+} from '../lib/finance-month.ts';
 
 test('aporte reduz a conta, mas não entra nas despesas', () => {
   const incomeCents = 500_000;
@@ -39,6 +43,15 @@ test('intervalo mensal inclui o primeiro dia e exclui o mês seguinte', () => {
     next: '2027-01-01',
   });
   assert.equal(getMonthRange('2026-13'), null);
+});
+
+test('virada do mês segue Brasília, não UTC ou o fuso do navegador', () => {
+  const beforeMidnight = new Date('2026-10-01T02:59:59.000Z');
+  const atMidnight = new Date('2026-10-01T03:00:00.000Z');
+  assert.equal(todayInBrazil(beforeMidnight), '2026-09-30');
+  assert.equal(currentMonthInBrazil(beforeMidnight), '2026-09');
+  assert.equal(todayInBrazil(atMidnight), '2026-10-01');
+  assert.equal(currentMonthInBrazil(atMidnight), '2026-10');
 });
 
 test('limite mensal interpreta valores monetários sem perder centavos', () => {

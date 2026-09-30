@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb } from '@/db';
+import { currentMonthInBrazil } from '@/lib/finance-month';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,12 +76,8 @@ function invoiceDueDate(month: string, closingDay: number, dueDay: number) {
   return dateForMonth(dueMonth, dueDay);
 }
 
-function getCurrentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
 function monthOptions(databaseMonths: string[]) {
-  const current = getCurrentMonth();
+  const current = currentMonthInBrazil();
   const months = new Set(databaseMonths);
   for (let offset = -6; offset <= 12; offset += 1) {
     months.add(addMonths(current, offset));
@@ -99,7 +96,7 @@ export async function GET(request: Request) {
     }
 
     const url = new URL(request.url);
-    const month = url.searchParams.get('month') ?? getCurrentMonth();
+    const month = url.searchParams.get('month') ?? currentMonthInBrazil();
     const requestedCardId = Number(url.searchParams.get('cardId'));
 
     if (!monthPattern.test(month)) {

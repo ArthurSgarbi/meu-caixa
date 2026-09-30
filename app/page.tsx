@@ -59,6 +59,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { currentMonthInBrazil, todayInBrazil } from '@/lib/finance-month';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
@@ -168,18 +169,6 @@ const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'UTC',
 });
 
-function localToday() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function currentMonth() {
-  return localToday().slice(0, 7);
-}
-
 function formatCurrency(cents: number) {
   return currencyFormatter.format(cents / 100);
 }
@@ -252,7 +241,7 @@ export default function Home() {
   const [session, setSession] = useState<SessionData | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
   const [sessionError, setSessionError] = useState('');
-  const [month, setMonth] = useState(currentMonth);
+  const [month, setMonth] = useState(currentMonthInBrazil);
   const [data, setData] = useState<FinanceData>(emptyData);
   const [budgetRefreshKey, setBudgetRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -863,7 +852,7 @@ export default function Home() {
                         name="transactionDate"
                         required
                         type="date"
-                        defaultValue={localToday()}
+                        defaultValue={todayInBrazil()}
                         className="h-11"
                       />
                     </div>
@@ -1084,7 +1073,7 @@ export default function Home() {
                       name="investmentDate"
                       type="date"
                       required
-                      defaultValue={localToday()}
+                      defaultValue={todayInBrazil()}
                       className="h-11"
                     />
                   </div>

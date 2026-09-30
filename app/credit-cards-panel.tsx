@@ -34,6 +34,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { currentMonthInBrazil, todayInBrazil } from '@/lib/finance-month';
 import {
   NativeSelect,
   NativeSelectOption,
@@ -124,18 +125,6 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'UTC',
 });
 
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7);
-}
-
-function localToday() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 function formatCurrency(cents: number) {
   return currencyFormatter.format(cents / 100);
 }
@@ -167,7 +156,7 @@ function formString(value: FormDataEntryValue | null) {
 export function CreditCardsPanel() {
   const [data, setData] = useState<CreditCardsResponse>(emptyData);
   const [selectedCardId, setSelectedCardId] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthInBrazil);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [invoiceSaving, setInvoiceSaving] = useState(false);
@@ -418,7 +407,7 @@ export function CreditCardsPanel() {
                 />
                 <MetricCard
                   label={
-                    selectedMonth === currentMonth()
+                    selectedMonth === currentMonthInBrazil()
                       ? 'Valor a pagar'
                       : 'Fatura selecionada'
                   }
@@ -526,7 +515,7 @@ export function CreditCardsPanel() {
                     name="purchaseDate"
                     required
                     type="date"
-                    defaultValue={localToday()}
+                    defaultValue={todayInBrazil()}
                     className="h-11"
                   />
                 </div>

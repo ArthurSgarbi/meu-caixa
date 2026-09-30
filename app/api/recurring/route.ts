@@ -1,7 +1,7 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb, type Database } from '@/db';
 import { seedCategories } from '@/lib/finance-categories';
-import { getMonthRange } from '@/lib/finance-month';
+import { getMonthRange, todayInBrazil } from '@/lib/finance-month';
 import {
   addMonths,
   isValidDate,
@@ -10,15 +10,6 @@ import {
 } from '@/lib/recurring';
 
 export const dynamic = 'force-dynamic';
-
-function todayInBrazil() {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
 
 function parseRule(body: Record<string, unknown>) {
   const description =
