@@ -275,7 +275,7 @@ export function SimulationsPanel() {
               Projete antes de decidir
             </h1>
           </div>
-          <Badge className="border border-white/15 bg-[#292d35]/80 text-white">
+          <Badge className="border border-white/15 bg-[#212F52]/80 text-white">
             Juros compostos · evolução mensal
           </Badge>
         </div>
@@ -713,8 +713,8 @@ function CurveChart({
           datasets.push({
             label: targetLabel ?? 'Gasto futuro',
             data: points.map(() => targetCents),
-            borderColor: '#fb923c',
-            backgroundColor: '#fb923c11',
+            borderColor: '#EEE6DB',
+            backgroundColor: '#EEE6DB11',
             borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 0,
@@ -739,7 +739,7 @@ function CurveChart({
             interaction: { intersect: false, mode: 'index' },
             plugins: {
               legend: {
-                labels: { color: '#d8dde6', usePointStyle: true, boxWidth: 8 },
+                labels: { color: '#EEE6DB', usePointStyle: true, boxWidth: 8 },
               },
               tooltip: {
                 callbacks: {
@@ -751,13 +751,13 @@ function CurveChart({
             scales: {
               x: {
                 grid: { color: 'rgba(255,255,255,.05)' },
-                ticks: { color: '#939baa', maxTicksLimit: 7 },
+                ticks: { color: '#BFC7D3', maxTicksLimit: 7 },
               },
               y: {
                 beginAtZero: true,
                 grid: { color: 'rgba(255,255,255,.08)' },
                 ticks: {
-                  color: '#939baa',
+                  color: '#BFC7D3',
                   callback: (value) => formatCurrency(Number(value)),
                 },
               },
@@ -776,7 +776,7 @@ function CurveChart({
   return (
     <figure
       aria-label={ariaLabel}
-      className="h-64 rounded-xl border border-white/10 bg-[#242830] p-3"
+      className="h-64 rounded-xl border border-white/10 bg-[#18243F] p-3"
     >
       <canvas ref={canvasRef}>{ariaLabel}</canvas>
     </figure>
@@ -812,7 +812,7 @@ function SaveScenario({
         type="button"
         disabled={saving || name.trim().length < 2}
         onClick={onSave}
-        className="bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
+        className="bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
       >
         {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
         {saving ? 'Salvando...' : 'Salvar cenário'}

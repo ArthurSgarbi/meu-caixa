@@ -131,17 +131,17 @@ export function AssistantPanel() {
             um plano financeiro com cálculos claros.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#292d35]/75 px-3 py-2 text-xs text-white/75">
+        <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#212F52]/75 px-3 py-2 text-xs text-white/75">
           <ShieldCheck className="size-4 text-white" />
           Dados isolados por usuário
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_310px]">
-        <Card className="overflow-hidden border-white/15 bg-[#292d35]/90 text-white shadow-2xl shadow-black/20">
+        <Card className="overflow-hidden border-white/15 bg-[#212F52]/90 text-white shadow-2xl shadow-black/20">
           <CardHeader className="border-b border-white/10 bg-white/[0.035]">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#ff6b35] to-[#d82828] text-white shadow-lg shadow-red-950/25">
+              <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#EEE6DB] to-[#D2B589] text-[#0B0B0D] shadow-lg shadow-black/20">
                 <Bot className="size-5" />
               </span>
               <div>
@@ -173,14 +173,14 @@ export function AssistantPanel() {
                     <div
                       className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[75%] ${
                         message.role === 'user'
-                          ? 'rounded-br-md bg-gradient-to-br from-[#ff6533] to-[#df2f2f] text-white'
+                          ? 'rounded-br-md bg-gradient-to-br from-[#EEE6DB] to-[#D2B589] text-[#0B0B0D]'
                           : 'rounded-bl-md border border-white/10 bg-white/[0.065] text-white/90'
                       }`}
                     >
                       {message.content}
                     </div>
                     {message.role === 'user' ? (
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#292d35]">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#212F52]">
                         <UserRound className="size-4" />
                       </span>
                     ) : null}
@@ -194,9 +194,9 @@ export function AssistantPanel() {
                     </span>
                     <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-sm text-white/65">
                       <span className="mr-2 inline-flex gap-1 align-middle">
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#ff6b35] [animation-delay:-.3s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#ff6b35] [animation-delay:-.15s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#ff6b35]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB] [animation-delay:-.3s]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB] [animation-delay:-.15s]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB]" />
                       </span>
                       A IA está digitando...
                     </div>
@@ -231,14 +231,14 @@ export function AssistantPanel() {
                   disabled={sending}
                   placeholder="Ex.: Onde gastei mais este mês?"
                   aria-label="Mensagem para a assistente"
-                  className="max-h-36 min-h-14 resize-none border-white/15 bg-[#202329] px-4 py-3 text-white placeholder:text-white/40"
+                  className="max-h-36 min-h-14 resize-none border-white/15 bg-[#121B31] px-4 py-3 text-white placeholder:text-white/40"
                 />
                 <Button
                   type="submit"
                   size="icon"
                   disabled={sending || !draft.trim()}
                   aria-label="Enviar mensagem"
-                  className="size-12 shrink-0 bg-white text-[#292d35] hover:bg-white/85"
+                  className="size-12 shrink-0 bg-white text-[#212F52] hover:bg-white/85"
                 >
                   {sending ? (
                     <LoaderCircle className="animate-spin" />
@@ -260,7 +260,7 @@ export function AssistantPanel() {
         </Card>
 
         <aside className="space-y-5">
-          <Card className="border-white/15 bg-[#292d35]/80 text-white">
+          <Card className="border-white/15 bg-[#212F52]/80 text-white">
             <CardHeader>
               <CardTitle className="text-base">O que posso fazer</CardTitle>
             </CardHeader>
@@ -283,7 +283,7 @@ export function AssistantPanel() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/15 bg-[#292d35]/80 text-white">
+          <Card className="border-white/15 bg-[#212F52]/80 text-white">
             <CardHeader>
               <CardTitle className="text-base">Perguntas rápidas</CardTitle>
             </CardHeader>
@@ -294,7 +294,7 @@ export function AssistantPanel() {
                   type="button"
                   disabled={sending}
                   onClick={() => void sendMessage(suggestion)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-left text-xs leading-5 text-white/75 transition hover:border-[#ff6b35]/60 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-left text-xs leading-5 text-white/75 transition hover:border-[#EEE6DB]/60 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {suggestion}
                 </button>
@@ -318,7 +318,7 @@ function Capability({
 }) {
   return (
     <div className="flex gap-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 text-[#ff8b60] [&_svg]:size-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 text-[#E9E6E1] [&_svg]:size-4">
         {icon}
       </span>
       <div>

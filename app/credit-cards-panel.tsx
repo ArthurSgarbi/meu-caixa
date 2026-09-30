@@ -367,7 +367,7 @@ export function CreditCardsPanel() {
                   aria-label="Selecionar cartão"
                   value={selectedCardId}
                   onChange={(event) => setSelectedCardId(event.target.value)}
-                  className="min-w-48 border-white/15 bg-[#292d35]/90 text-white"
+                  className="min-w-48 border-white/15 bg-[#212F52]/90 text-white"
                 >
                   {data.cards.map((card) => (
                     <NativeSelectOption key={card.id} value={String(card.id)}>
@@ -383,7 +383,7 @@ export function CreditCardsPanel() {
                   setMessage('');
                   setNewCardOpen(true);
                 }}
-                className="border border-white/20 bg-white text-[#242830] hover:bg-white/90"
+                className="border border-white/20 bg-white text-[#18243F] hover:bg-white/90"
               >
                 <Plus /> Novo cartão
               </Button>
@@ -420,7 +420,7 @@ export function CreditCardsPanel() {
                   icon={<Landmark />}
                 />
               </div>
-              <div className="overflow-hidden rounded-full bg-[#292d35]/65">
+              <div className="overflow-hidden rounded-full bg-[#212F52]/65">
                 <div
                   className="h-2 rounded-full bg-white transition-[width] duration-300"
                   style={{ width: `${usedPercentage}%` }}
@@ -462,7 +462,7 @@ export function CreditCardsPanel() {
           <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
             <CardHeader className="border-b border-white/10 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <span className="grid size-8 place-items-center rounded-lg bg-white text-[#242830]">
+                <span className="grid size-8 place-items-center rounded-lg bg-white text-[#18243F]">
                   <Plus className="size-4" />
                 </span>
                 Nova compra
@@ -537,7 +537,7 @@ export function CreditCardsPanel() {
                 <Button
                   type="submit"
                   disabled={saving || loading}
-                  className="h-11 w-full bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
+                  className="h-11 w-full bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
                 >
                   {saving ? (
                     <LoaderCircle className="animate-spin" />
@@ -590,8 +590,8 @@ export function CreditCardsPanel() {
                   <Badge
                     className={`mt-2 ${
                       data.invoice?.status === 'paid'
-                        ? 'bg-white text-[#242830]'
-                        : 'bg-[#f4513e] text-white'
+                        ? 'bg-white text-[#18243F]'
+                        : 'bg-[#D2B589] text-[#0B0B0D]'
                     }`}
                   >
                     {data.invoice?.status === 'paid' ? 'Paga' : 'Em aberto'}
@@ -816,14 +816,14 @@ function MetricCard({
   return (
     <Card
       className={`border-0 shadow-[0_18px_45px_rgba(0,0,0,.18)] ring-1 ${
-        featured ? 'bg-white text-[#242830] ring-white/40' : 'ring-white/15'
+        featured ? 'bg-white text-[#18243F] ring-white/40' : 'ring-white/15'
       }`}
     >
       <CardContent className="flex items-start justify-between gap-3 p-5">
         <div>
           <p
             className={`text-sm ${
-              featured ? 'text-[#4b505b]' : 'text-muted-foreground'
+              featured ? 'text-[#394965]' : 'text-muted-foreground'
             }`}
           >
             {label}
@@ -834,7 +834,7 @@ function MetricCard({
           {detail && (
             <p
               className={`mt-1 text-xs ${
-                featured ? 'text-[#606671]' : 'text-muted-foreground'
+                featured ? 'text-[#50617D]' : 'text-muted-foreground'
               }`}
             >
               {detail}
@@ -843,7 +843,7 @@ function MetricCard({
         </div>
         <span
           className={`grid size-9 shrink-0 place-items-center rounded-lg ${
-            featured ? 'bg-[#242830] text-white' : 'bg-white/10 text-white'
+            featured ? 'bg-[#18243F] text-white' : 'bg-white/10 text-white'
           }`}
         >
           {icon}

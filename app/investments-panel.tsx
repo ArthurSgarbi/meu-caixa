@@ -138,15 +138,15 @@ const assetClasses = [
 ];
 
 const assetColors: Record<string, string> = {
-  'Renda fixa': '#ffffff',
-  Ações: '#7367f0',
-  'Fundos imobiliários': '#f6a94a',
-  Criptoativos: '#ee6b82',
-  Outros: '#7a92ad',
+  'Renda fixa': '#FEFFFF',
+  Ações: '#D2B589',
+  'Fundos imobiliários': '#EEE6DB',
+  Criptoativos: '#E9E6E1',
+  Outros: '#8292B1',
 };
 
 const chartConfig = {
-  value: { label: 'Patrimônio atual', color: '#7367f0' },
+  value: { label: 'Patrimônio atual', color: '#D2B589' },
 } satisfies ChartConfig;
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', {
@@ -523,7 +523,7 @@ export function InvestmentsPanel() {
                 Seu patrimônio em um só lugar
               </h1>
             </div>
-            <Badge className="border border-white/15 bg-[#292d35]/80 text-white">
+            <Badge className="border border-white/15 bg-[#212F52]/80 text-white">
               CDI/CDB · 252 dias úteis
             </Badge>
           </div>
@@ -640,7 +640,7 @@ export function InvestmentsPanel() {
               <Button
                 type="submit"
                 disabled={walletSaving || walletLoading}
-                className="bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
+                className="bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
               >
                 {walletSaving ? (
                   <LoaderCircle className="animate-spin" />
@@ -873,7 +873,7 @@ export function InvestmentsPanel() {
                 type="submit"
                 size="lg"
                 disabled={saving || loading}
-                className="h-11 w-full bg-[#f4513e] font-semibold text-white hover:bg-[#e83232]"
+                className="h-11 w-full bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
               >
                 {saving ? <LoaderCircle className="animate-spin" /> : <Plus />}
                 {saving ? 'Adicionando...' : 'Adicionar investimento'}
@@ -924,7 +924,7 @@ export function InvestmentsPanel() {
                           currencyFormatter.format(Number(value))
                         }
                         contentStyle={{
-                          backgroundColor: '#242830',
+                          backgroundColor: '#18243F',
                           border: '1px solid rgba(255,255,255,.18)',
                           borderRadius: '10px',
                           color: '#ffffff',
@@ -1015,7 +1015,7 @@ export function InvestmentsPanel() {
                   return (
                     <article
                       key={investment.id}
-                      className="rounded-xl border border-white/10 bg-[#242830] p-4"
+                      className="rounded-xl border border-white/10 bg-[#18243F] p-4"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1232,7 +1232,7 @@ export function InvestmentsPanel() {
                 <Button
                   type="submit"
                   disabled={editSaving}
-                  className="bg-[#f4513e] text-white hover:bg-[#e83232]"
+                  className="bg-[#D2B589] text-[#0B0B0D] hover:bg-[#BD9B69]"
                 >
                   {editSaving && <LoaderCircle className="animate-spin" />}
                   {editSaving ? 'Salvando...' : 'Salvar alterações'}
@@ -1314,7 +1314,7 @@ function InvestmentSummary({
       className={`rounded-2xl border p-5 backdrop-blur-sm ${
         featured
           ? 'border-white/30 bg-white/10'
-          : 'border-white/15 bg-[#292d35]/80'
+          : 'border-white/15 bg-[#212F52]/80'
       }`}
     >
       <div className="mb-4 flex items-center justify-between">

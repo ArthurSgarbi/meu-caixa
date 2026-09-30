@@ -233,7 +233,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
             className={
               marketData?.marketOpen
                 ? 'bg-white/10 text-white'
-                : 'bg-[#292d35] text-white/75'
+                : 'bg-[#212F52] text-white/75'
             }
           >
             <span
@@ -325,7 +325,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                   onClick={() => setSelectedTicker(quote.ticker)}
                   className={`h-2 rounded-full transition-all ${
                     index === selectedQuoteIndex
-                      ? 'w-7 bg-[#ff7557]'
+                      ? 'w-7 bg-[#D2B589]'
                       : 'w-2 bg-white/30 hover:bg-white/60'
                   }`}
                 />
@@ -413,7 +413,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                         'Preço',
                       ]}
                       contentStyle={{
-                        backgroundColor: '#242830',
+                        backgroundColor: '#18243F',
                         border: '1px solid rgba(255,255,255,.18)',
                         borderRadius: '10px',
                         color: '#ffffff',
@@ -422,7 +422,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                     <Line
                       type="monotone"
                       dataKey="price"
-                      stroke="#ff7557"
+                      stroke="#D2B589"
                       strokeWidth={3}
                       dot={false}
                       activeDot={{ r: 4, fill: '#ffffff' }}
