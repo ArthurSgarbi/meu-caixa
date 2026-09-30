@@ -672,7 +672,7 @@ export default function Home() {
             <div className="flex w-full min-w-0 flex-col-reverse items-stretch gap-3 lg:w-auto lg:flex-1 lg:flex-row lg:items-center lg:justify-end">
               <TabsList
                 aria-label="Áreas do Meu Caixa"
-                className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-foreground/15 bg-card/80 p-1 sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0 "
+                className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-foreground/15 bg-card/80 p-1 group-data-horizontal/tabs:h-auto sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0"
               >
                 <TabsTrigger
                   value="expenses"
@@ -706,7 +706,7 @@ export default function Home() {
                 </TabsTrigger>
                 <TabsTrigger
                   value="settings"
-                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <Settings /> Configurações
                 </TabsTrigger>
