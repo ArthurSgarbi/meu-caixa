@@ -24,4 +24,14 @@ O JSON é um backup portátil por conta. Não substitui a recuperação da inst�
 3. Valide nessa branch a integridade das tabelas, contagem por `owner_id`, migrações e fluxos críticos em ambiente de teste.
 4. Só então planeje a troca da conexão da Vercel ou a recuperação de registros específicos, mantendo uma cópia do estado atual para possível reversão.
 
-Esse ensaio de recuperação de infraestrutura depende das permissões e da retenção configuradas no projeto Neon. **Não foi executado contra o banco de produção nesta entrega.**
+### Ensaio isolado em 29/09/2026
+
+O procedimento de recuperação pontual foi testado no projeto Neon `meu-caixa-db`, **sem restaurar nem escrever na branch `main`**:
+
+1. Uma branch temporária foi criada a partir de um instante anterior da `main`.
+2. As contagens foram comparadas por consultas somente leitura: 12 categorias e nenhum registro nas tabelas financeiras verificadas, tanto na origem quanto na cópia.
+3. Uma tabela e um registro sintéticos foram criados **somente na branch temporária** para simular uma alteração indesejada.
+4. A prévia histórica mostrou que a tabela sintética não existia no ponto escolhido. A restauração da branch temporária foi concluída e uma nova consulta confirmou que a tabela desapareceu, preservando as 12 categorias.
+5. Uma consulta final na `main` confirmou que a tabela sintética nunca esteve lá. A branch restaurada e a cópia anterior gerada pelo Neon foram configuradas para expirar em 30/09/2026, por volta de 22h20 e 22h23 (horário de São Paulo), respectivamente.
+
+O projeto estava com **retenção histórica de 6 horas** no momento do ensaio. Portanto, esse teste comprova a recuperação pontual de uma branch isolada dentro dessa janela, mas **não** uma restauração completa do site ou de dados financeiros reais: não havia registros financeiros nessas tabelas. Em um incidente real, confirme primeiro o horário recuperável, valide os dados e a aplicação na cópia e só depois decida como recuperar a produção.
