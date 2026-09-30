@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
+import { PreferencesProvider } from './preferences-provider';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({
@@ -27,7 +28,7 @@ export default function RootLayout({
           signUpUrl="/sign-up"
           afterSignOutUrl="/"
         >
-          {children}
+          <PreferencesProvider>{children}</PreferencesProvider>
         </ClerkProvider>
       </body>
     </html>

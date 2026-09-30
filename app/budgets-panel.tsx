@@ -1,4 +1,5 @@
 'use client';
+import { useMoneyFormatter } from './preferences-provider';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
 
@@ -36,15 +37,6 @@ type BudgetsResponse = {
   error?: string;
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
-
-function formatCurrency(cents: number) {
-  return currencyFormatter.format(cents / 100);
-}
-
 export function BudgetsPanel({
   month,
   refreshKey,
@@ -52,6 +44,7 @@ export function BudgetsPanel({
   month: string;
   refreshKey: number;
 }) {
+  const formatCurrency = useMoneyFormatter();
   const [categories, setCategories] = useState<BudgetCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [limitInput, setLimitInput] = useState('');
@@ -211,8 +204,8 @@ export function BudgetsPanel({
       className="mx-auto max-w-7xl px-5 pb-8 pt-6 sm:px-8 lg:px-10"
       aria-label="Orçamentos por categoria"
     >
-      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-        <CardHeader className="border-b border-white/10 pb-4">
+      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+        <CardHeader className="border-b border-foreground/10 pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
             <PiggyBank className="size-5 text-primary" /> Orçamentos por
             categoria
@@ -284,7 +277,7 @@ export function BudgetsPanel({
           {(error || message) && (
             <output
               aria-live="polite"
-              className={`flex items-center gap-2 text-sm ${error ? 'text-red-200' : 'text-white'}`}
+              className={`flex items-center gap-2 text-sm ${error ? 'text-destructive' : 'text-foreground'}`}
             >
               {error && <AlertCircle className="size-4" />}
               {error || message}
@@ -301,7 +294,7 @@ export function BudgetsPanel({
               Tentar carregar orçamentos novamente
             </Button>
           ) : activeBudgets.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-white/20 p-5 text-sm text-muted-foreground">
+            <p className="rounded-lg border border-dashed border-foreground/20 p-5 text-sm text-muted-foreground">
               Nenhum limite definido para este mês. Escolha uma categoria acima
               para começar.
             </p>
@@ -316,7 +309,7 @@ export function BudgetsPanel({
                 return (
                   <div
                     key={category.categoryId}
-                    className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-4"
+                    className="space-y-3 rounded-xl border border-foreground/15 bg-inverse/5 p-4"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -329,7 +322,7 @@ export function BudgetsPanel({
                         </p>
                       </div>
                       <span
-                        className={`text-sm font-semibold tabular-nums ${remaining < 0 ? 'text-red-300' : 'text-white'}`}
+                        className={`text-sm font-semibold tabular-nums ${remaining < 0 ? 'text-destructive' : 'text-foreground'}`}
                       >
                         {percentage}%
                       </span>
@@ -339,7 +332,7 @@ export function BudgetsPanel({
                       aria-label={`Uso do orçamento de ${category.categoryName}`}
                     />
                     <p
-                      className={`text-sm ${remaining < 0 ? 'text-red-300' : 'text-muted-foreground'}`}
+                      className={`text-sm ${remaining < 0 ? 'text-destructive' : 'text-muted-foreground'}`}
                     >
                       {remaining < 0
                         ? `Excedeu ${formatCurrency(-remaining)}`

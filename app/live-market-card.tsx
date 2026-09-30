@@ -1,4 +1,5 @@
 'use client';
+import { useMoneyFormatter, usePreferences } from './preferences-provider';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
 
@@ -59,11 +60,6 @@ type MarketResponse = Partial<MarketData> & {
   code?: string;
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
-
 const timeFormatter = new Intl.DateTimeFormat('pt-BR', {
   hour: '2-digit',
   minute: '2-digit',
@@ -79,6 +75,8 @@ function formatQuoteTime(value: string | null) {
 }
 
 export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
+  const formatCurrency = useMoneyFormatter();
+  const { preferences, motionReduced } = usePreferences();
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [selectedTicker, setSelectedTicker] = useState('');
   const [loading, setLoading] = useState(false);
@@ -168,7 +166,12 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
       refreshing = true;
       const marketOpen = await loadMarketData(controller.signal);
       refreshing = false;
-      if (controller.signal.aborted || document.hidden) return;
+      if (
+        controller.signal.aborted ||
+        document.hidden ||
+        !preferences.marketAutoRefresh
+      )
+        return;
       timer = window.setTimeout(
         scheduleRefresh,
         marketOpen ? 60_000 : 15 * 60_000,
@@ -177,7 +180,8 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
 
     const handleVisibilityChange = () => {
       if (timer !== undefined) window.clearTimeout(timer);
-      if (!document.hidden) void scheduleRefresh();
+      if (!document.hidden && preferences.marketAutoRefresh)
+        void scheduleRefresh();
     };
 
     queueMicrotask(() => void scheduleRefresh());
@@ -187,7 +191,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
       if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [assetKey, loadMarketData, refreshVersion]);
+  }, [assetKey, loadMarketData, refreshVersion, preferences.marketAutoRefresh]);
 
   const quotes = useMemo(
     () =>
@@ -221,15 +225,15 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
 
   if (assets.length === 0) {
     return (
-      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-        <CardHeader className="border-b border-white/10 pb-4">
+      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+        <CardHeader className="border-b border-foreground/10 pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Activity className="size-5 text-white" />
+            <Activity className="size-5 text-foreground" />
             Mercado ao vivo
           </CardTitle>
         </CardHeader>
         <CardContent className="py-10 text-center">
-          <Activity className="mx-auto mb-3 size-9 text-white/70" />
+          <Activity className="mx-auto mb-3 size-9 text-foreground/70" />
           <p className="font-semibold">Nenhum ativo conectado à bolsa</p>
           <p className="mx-auto mt-1 max-w-xl text-sm text-muted-foreground">
             Edite ou cadastre uma ação ou FII informando o código B3 e a
@@ -241,11 +245,11 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
   }
 
   return (
-    <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-      <CardHeader className="gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
+    <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+      <CardHeader className="gap-4 border-b border-foreground/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Activity className="size-5 text-white" />
+            <Activity className="size-5 text-foreground" />
             Mercado ao vivo
           </CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -256,19 +260,21 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
           <Badge
             className={
               marketData?.marketOpen
-                ? 'bg-white/10 text-white'
-                : 'bg-[#212F52] text-white/75'
+                ? 'bg-inverse/10 text-foreground'
+                : 'bg-card text-foreground/75'
             }
           >
             <span
               className={`mr-1.5 size-2 rounded-full ${
-                marketData?.marketOpen ? 'bg-emerald-400' : 'bg-white/40'
+                marketData?.marketOpen ? 'bg-emerald-400' : 'bg-inverse/40'
               }`}
             />
             {!marketData
               ? 'Consultando pregão...'
               : marketData.marketOpen
-                ? 'Pregão aberto · 1 min'
+                ? preferences.marketAutoRefresh
+                  ? 'Pregão aberto · 1 min'
+                  : 'Pregão aberto · manual'
                 : 'Mercado fechado · pausado'}
           </Badge>
           <Button
@@ -289,21 +295,19 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
       </CardHeader>
       <CardContent className="space-y-5">
         {error ? (
-          <div className="flex items-start gap-2 rounded-xl bg-red-950/70 px-4 py-3 text-sm text-red-200">
+          <div className="flex items-start gap-2 rounded-xl bg-destructive/10 px-4 py-3 text-sm text-destructive">
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <span>{error}</span>
           </div>
         ) : null}
 
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="rounded-xl border border-foreground/10 bg-inverse/5 p-4">
             <p className="text-xs text-muted-foreground">
               Patrimônio acompanhado pela bolsa
             </p>
             <p className="mt-1 text-2xl font-bold tabular-nums">
-              {quotes.length
-                ? currencyFormatter.format(livePortfolioValue)
-                : '—'}
+              {quotes.length ? formatCurrency(livePortfolioValue * 100) : '—'}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Calculado por preço × quantidade dos ativos com ticker.
@@ -332,7 +336,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
         </div>
 
         {quotes.length ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 bg-inverse/5 px-3 py-2">
             <Button
               type="button"
               variant="outline"
@@ -358,8 +362,8 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                   onClick={() => setSelectedTicker(quote.ticker)}
                   className={`h-2 rounded-full transition-all ${
                     index === selectedQuoteIndex
-                      ? 'w-7 bg-[#D2B589]'
-                      : 'w-2 bg-white/30 hover:bg-white/60'
+                      ? 'w-7 bg-primary'
+                      : 'w-2 bg-inverse/30 hover:bg-inverse/60'
                   }`}
                 />
               ))}
@@ -388,7 +392,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                   {selectedQuote.ticker} · {selectedQuote.name}
                 </p>
                 <p className="mt-1 text-3xl font-bold tabular-nums">
-                  {currencyFormatter.format(selectedQuote.price)}
+                  {formatCurrency(selectedQuote.price * 100)}
                 </p>
               </div>
               <div className="text-right">
@@ -396,7 +400,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                   className={`font-bold tabular-nums ${
                     selectedQuote.changePercent >= 0
                       ? 'text-emerald-300'
-                      : 'text-red-300'
+                      : 'text-destructive'
                   }`}
                 >
                   {selectedQuote.changePercent >= 0 ? '+' : ''}
@@ -410,6 +414,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
             </div>
 
             <div
+              data-private-chart="true"
               className="h-72 w-full"
               aria-label={`Gráfico de ${selectedQuote.ticker}`}
             >
@@ -417,14 +422,14 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={selectedQuote.points}>
                     <CartesianGrid
-                      stroke="rgba(255,255,255,.10)"
+                      stroke="var(--border)"
                       strokeDasharray="4 4"
                       vertical={false}
                     />
                     <XAxis
                       dataKey="timestamp"
                       tickFormatter={(value) => formatQuoteTime(String(value))}
-                      stroke="rgba(255,255,255,.45)"
+                      stroke="var(--muted-foreground)"
                       tickLine={false}
                       axisLine={false}
                       minTickGap={28}
@@ -432,7 +437,7 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                     <YAxis
                       domain={['auto', 'auto']}
                       tickFormatter={(value) => Number(value).toFixed(2)}
-                      stroke="rgba(255,255,255,.45)"
+                      stroke="var(--muted-foreground)"
                       tickLine={false}
                       axisLine={false}
                       width={58}
@@ -442,28 +447,29 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
                         `Horário: ${formatQuoteTime(String(value))}`
                       }
                       formatter={(value) => [
-                        currencyFormatter.format(Number(value)),
+                        formatCurrency(Number(value) * 100),
                         'Preço',
                       ]}
                       contentStyle={{
-                        backgroundColor: '#18243F',
-                        border: '1px solid rgba(255,255,255,.18)',
+                        backgroundColor: 'var(--popover)',
+                        border: '1px solid var(--border)',
                         borderRadius: '10px',
-                        color: '#ffffff',
+                        color: 'var(--foreground)',
                       }}
                     />
                     <Line
                       type="monotone"
                       dataKey="price"
-                      stroke="#D2B589"
+                      stroke="var(--chart-1)"
+                      isAnimationActive={!motionReduced}
                       strokeWidth={3}
                       dot={false}
-                      activeDot={{ r: 4, fill: '#ffffff' }}
+                      activeDot={{ r: 4, fill: 'var(--foreground)' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="grid h-full place-items-center rounded-xl border border-dashed border-white/15 text-center text-sm text-muted-foreground">
+                <div className="grid h-full place-items-center rounded-xl border border-dashed border-foreground/15 text-center text-sm text-muted-foreground">
                   O histórico intradiário aparecerá quando houver pontos de
                   negociação disponíveis.
                 </div>
@@ -483,8 +489,10 @@ export function LiveMarketCard({ assets }: { assets: TrackedAsset[] }) {
         <p className="text-xs leading-relaxed text-muted-foreground">
           Fonte: {marketData?.provider ?? 'brapi.dev'}. A cotação pode ter
           atraso conforme o plano contratado e não representa o gráfico oficial
-          do Banco Inter. A atualização de 1 minuto é pausada quando o mercado
-          está fechado ou quando esta página fica em segundo plano.
+          do Banco Inter.{' '}
+          {preferences.marketAutoRefresh
+            ? 'A atualização de 1 minuto é pausada quando o mercado está fechado ou a página fica em segundo plano.'
+            : 'Atualização automática desativada nas configurações; use o botão de atualizar.'}
         </p>
       </CardContent>
     </Card>

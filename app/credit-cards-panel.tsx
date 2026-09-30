@@ -1,4 +1,5 @@
 'use client';
+import { useMoneyFormatter } from './preferences-provider';
 import { parseCurrencyToCents } from '@/lib/frontend-input';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
@@ -112,10 +113,6 @@ const emptyData: CreditCardsResponse = {
   },
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
 const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
   month: 'long',
   year: 'numeric',
@@ -127,10 +124,6 @@ const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   year: 'numeric',
   timeZone: 'UTC',
 });
-
-function formatCurrency(cents: number) {
-  return currencyFormatter.format(cents / 100);
-}
 
 function formatMonth(month: string) {
   return monthFormatter.format(new Date(`${month}-01T00:00:00Z`));
@@ -146,6 +139,7 @@ function formString(value: FormDataEntryValue | null) {
 }
 
 export function CreditCardsPanel() {
+  const formatCurrency = useMoneyFormatter();
   const [data, setData] = useState<CreditCardsResponse>(emptyData);
   const [selectedCardId, setSelectedCardId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(currentMonthInBrazil);
@@ -370,11 +364,11 @@ export function CreditCardsPanel() {
 
   return (
     <section className="min-h-[calc(100vh-81px)] pb-16">
-      <header className="border-b border-white/15 text-white">
+      <header className="border-b border-foreground/15 text-foreground">
         <div className="mx-auto max-w-7xl px-5 pb-10 pt-9 sm:px-8 lg:px-10">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="mb-1 text-sm font-medium text-white">
+              <p className="mb-1 text-sm font-medium text-foreground">
                 Gestão de cartões de crédito
               </p>
               <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
@@ -388,7 +382,7 @@ export function CreditCardsPanel() {
                   value={selectedCardId}
                   disabled={saving || invoiceSaving}
                   onChange={(event) => setSelectedCardId(event.target.value)}
-                  className="min-w-48 border-white/15 bg-[#212F52]/90 text-white"
+                  className="min-w-48 border-foreground/15 bg-card/90 text-foreground"
                 >
                   {data.cards.map((card) => (
                     <NativeSelectOption key={card.id} value={String(card.id)}>
@@ -404,7 +398,7 @@ export function CreditCardsPanel() {
                   setMessage('');
                   setNewCardOpen(true);
                 }}
-                className="border border-white/20 bg-white text-[#18243F] hover:bg-white/90"
+                className="border border-foreground/20 bg-inverse text-inverse-foreground hover:bg-inverse/90"
               >
                 <Plus /> Novo cartão
               </Button>
@@ -419,7 +413,7 @@ export function CreditCardsPanel() {
           ) : loadError ? (
             <div
               role="alert"
-              className="space-y-3 rounded-xl bg-red-950/70 p-4 text-red-200"
+              className="space-y-3 rounded-xl bg-destructive/10 p-4 text-destructive"
             >
               <p>{loadError}</p>
               <Button variant="outline" onClick={() => void loadCards()}>
@@ -456,20 +450,20 @@ export function CreditCardsPanel() {
                   icon={<Landmark />}
                 />
               </div>
-              <div className="overflow-hidden rounded-full bg-[#212F52]/65">
+              <div className="overflow-hidden rounded-full bg-card/65">
                 <div
-                  className="h-2 rounded-full bg-white transition-[width] duration-300"
+                  className="h-2 rounded-full bg-inverse transition-[width] duration-300"
                   style={{ width: `${usedPercentage}%` }}
                 />
               </div>
-              <p className="mt-2 text-right text-xs text-white/75">
+              <p className="mt-2 text-right text-xs text-foreground/75">
                 {usedPercentage.toFixed(0)}% do limite comprometido
               </p>
             </>
           ) : (
-            <Card className="border-0 ring-1 ring-white/15">
+            <Card className="border-0 ring-1 ring-foreground/15">
               <CardContent className="flex flex-col items-center px-6 py-10 text-center">
-                <CreditCard className="mb-4 size-10 text-white" />
+                <CreditCard className="mb-4 size-10 text-foreground" />
                 <p className="text-lg font-semibold">
                   Cadastre seu primeiro cartão
                 </p>
@@ -495,10 +489,10 @@ export function CreditCardsPanel() {
 
       {data.selectedCard && !loading && !loadError && (
         <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-          <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
-            <CardHeader className="border-b border-white/10 pb-4">
+          <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
+            <CardHeader className="border-b border-foreground/10 pb-4">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <span className="grid size-8 place-items-center rounded-lg bg-white text-[#18243F]">
+                <span className="grid size-8 place-items-center rounded-lg bg-inverse text-inverse-foreground">
                   <Plus className="size-4" />
                 </span>
                 Nova compra
@@ -560,8 +554,8 @@ export function CreditCardsPanel() {
                     aria-live="polite"
                     className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${
                       error
-                        ? 'bg-red-950/70 text-red-200'
-                        : 'bg-white/10 text-white'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-inverse/10 text-foreground'
                     }`}
                   >
                     {error && (
@@ -573,7 +567,7 @@ export function CreditCardsPanel() {
                 <Button
                   type="submit"
                   disabled={saving || loading}
-                  className="h-11 w-full bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
+                  className="h-11 w-full bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
                 >
                   {saving ? (
                     <LoaderCircle className="animate-spin" />
@@ -587,8 +581,8 @@ export function CreditCardsPanel() {
           </Card>
 
           <div className="min-w-0 space-y-6">
-            <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-              <CardHeader className="gap-4 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+              <CardHeader className="gap-4 border-b border-foreground/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="text-lg">
                     Histórico de faturas
@@ -622,13 +616,13 @@ export function CreditCardsPanel() {
                   value={formatDate(data.invoice?.dueDate ?? '')}
                   icon={<Clock3 />}
                 />
-                <div className="rounded-xl bg-white/8 p-4">
+                <div className="rounded-xl bg-inverse/8 p-4">
                   <p className="text-sm text-muted-foreground">Situação</p>
                   <Badge
                     className={`mt-2 ${
                       data.invoice?.status === 'paid'
-                        ? 'bg-white text-[#18243F]'
-                        : 'bg-[#D2B589] text-[#0B0B0D]'
+                        ? 'bg-inverse text-inverse-foreground'
+                        : 'bg-primary text-primary-foreground'
                     }`}
                   >
                     {data.invoice?.status === 'paid' ? 'Paga' : 'Em aberto'}
@@ -662,8 +656,8 @@ export function CreditCardsPanel() {
               </CardContent>
             </Card>
 
-            <Card className="min-h-80 border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-              <CardHeader className="border-b border-white/10 pb-4">
+            <Card className="min-h-80 border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+              <CardHeader className="border-b border-foreground/10 pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <ReceiptText className="size-5" />
                   Compras da fatura
@@ -683,7 +677,7 @@ export function CreditCardsPanel() {
                 ) : data.transactions.length === 0 ? (
                   <div className="grid h-56 place-items-center px-6 text-center">
                     <div>
-                      <ShieldCheck className="mx-auto mb-3 size-9 text-white/70" />
+                      <ShieldCheck className="mx-auto mb-3 size-9 text-foreground/70" />
                       <p className="font-semibold">
                         Nenhuma compra nesta fatura
                       </p>
@@ -811,7 +805,7 @@ export function CreditCardsPanel() {
             {error && (
               <output
                 aria-live="polite"
-                className="flex items-start gap-2 rounded-lg bg-red-950/70 px-3 py-2.5 text-sm text-red-200"
+                className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
               >
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
                 {error}
@@ -854,14 +848,16 @@ function MetricCard({
   return (
     <Card
       className={`border-0 shadow-[0_18px_45px_rgba(0,0,0,.18)] ring-1 ${
-        featured ? 'bg-white text-[#18243F] ring-white/40' : 'ring-white/15'
+        featured
+          ? 'bg-inverse text-inverse-foreground ring-foreground/40'
+          : 'ring-foreground/15'
       }`}
     >
       <CardContent className="flex items-start justify-between gap-3 p-5">
         <div>
           <p
             className={`text-sm ${
-              featured ? 'text-[#394965]' : 'text-muted-foreground'
+              featured ? 'text-inverse-foreground/80' : 'text-muted-foreground'
             }`}
           >
             {label}
@@ -872,7 +868,9 @@ function MetricCard({
           {detail && (
             <p
               className={`mt-1 text-xs ${
-                featured ? 'text-[#50617D]' : 'text-muted-foreground'
+                featured
+                  ? 'text-inverse-foreground/70'
+                  : 'text-muted-foreground'
               }`}
             >
               {detail}
@@ -881,7 +879,9 @@ function MetricCard({
         </div>
         <span
           className={`grid size-9 shrink-0 place-items-center rounded-lg ${
-            featured ? 'bg-[#18243F] text-white' : 'bg-white/10 text-white'
+            featured
+              ? 'bg-inverse-foreground text-inverse'
+              : 'bg-inverse/10 text-foreground'
           }`}
         >
           {icon}
@@ -901,7 +901,7 @@ function InvoiceDate({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-xl bg-white/8 p-4">
+    <div className="rounded-xl bg-inverse/8 p-4">
       <span className="flex items-center gap-2 text-sm text-muted-foreground">
         {icon} {label}
       </span>

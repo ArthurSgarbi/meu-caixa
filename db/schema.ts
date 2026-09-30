@@ -23,6 +23,17 @@ export const categories = pgTable(
   ],
 );
 
+export const userPreferences = pgTable(
+  'user_preferences',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    preferencesJson: text('preferences_json').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [uniqueIndex('idx_user_preferences_owner').on(table.ownerId)],
+);
+
 export const transactions = pgTable(
   'transactions',
   {

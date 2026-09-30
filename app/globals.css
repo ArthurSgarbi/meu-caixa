@@ -6,6 +6,8 @@
 
 @theme inline {
   --color-background: var(--background);
+  --color-inverse: var(--inverse);
+  --color-inverse-foreground: var(--inverse-foreground);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -60,6 +62,12 @@ body {
   --velvet: #212f52;
   --onyx: #0b0b0d;
   --background: var(--velvet);
+  --inverse: var(--pearl);
+  --inverse-foreground: var(--velvet);
+  --gradient-middle: #17223d;
+  --gradient-end: var(--onyx);
+  --brand-glow: rgb(233 230 225 / 10%);
+  color-scheme: dark;
   --foreground: var(--silk);
   --card: var(--velvet);
   --card-foreground: var(--pearl);
@@ -95,11 +103,16 @@ body {
 
 .brand-luxe {
   overflow-wrap: anywhere;
-  background-color: var(--velvet);
+  background-color: var(--background);
   background-image:
     radial-gradient(circle at 4% 2%, rgb(210 181 137 / 18%), transparent 34%),
-    radial-gradient(circle at 96% 95%, rgb(233 230 225 / 10%), transparent 38%),
-    linear-gradient(125deg, #212f52 0%, #17223d 55%, #0b0b0d 100%);
+    radial-gradient(circle at 96% 95%, var(--brand-glow), transparent 38%),
+    linear-gradient(
+      125deg,
+      var(--background) 0%,
+      var(--gradient-middle) 55%,
+      var(--gradient-end) 100%
+    );
   background-attachment: fixed;
   background-repeat: no-repeat;
   background-size: cover;
@@ -107,6 +120,87 @@ body {
 
 .dark {
   --destructive: oklch(0.704 0.191 22.216);
+}
+
+/* Inversão da paleta, não um filtro: ícones e gráficos conservam suas cores. */
+:root[data-theme='light'] {
+  color-scheme: light;
+  --background: var(--silk);
+  --foreground: var(--velvet);
+  --card: var(--pearl);
+  --card-foreground: var(--velvet);
+  --popover: var(--pearl);
+  --popover-foreground: var(--velvet);
+  --primary: var(--velvet);
+  --primary-foreground: var(--pearl);
+  --secondary: var(--marble);
+  --secondary-foreground: var(--velvet);
+  --muted: #f1eeea;
+  --muted-foreground: #53617a;
+  --accent: var(--champagne);
+  --accent-foreground: var(--onyx);
+  --border: rgb(33 47 82 / 20%);
+  --input: rgb(33 47 82 / 28%);
+  --ring: var(--velvet);
+  --inverse: var(--velvet);
+  --inverse-foreground: var(--pearl);
+  --gradient-middle: #f5f0e8;
+  --gradient-end: var(--pearl);
+  --brand-glow: rgb(33 47 82 / 7%);
+  --chart-1: #99753f;
+  --chart-2: var(--velvet);
+  --chart-3: #647798;
+  --chart-4: #9b7d53;
+  --chart-5: var(--onyx);
+  --sidebar: var(--pearl);
+  --sidebar-foreground: var(--velvet);
+  --sidebar-primary: var(--velvet);
+  --sidebar-primary-foreground: var(--pearl);
+  --sidebar-accent: var(--marble);
+  --sidebar-accent-foreground: var(--velvet);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--velvet);
+}
+
+html[data-large-text='true'] {
+  font-size: 18px;
+}
+html[data-reduce-motion='true'] *,
+html[data-reduce-motion='true'] *::before,
+html[data-reduce-motion='true'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* A máscara visual não substitui autenticação; os valores monetários são
+   também mascarados no texto e nos leitores de tela pelo formatador. */
+[data-private-chart] {
+  position: relative;
+}
+html[data-hide-balances='true'] [data-private-chart] > * {
+  visibility: hidden;
+}
+html[data-hide-balances='true'] [data-private-chart]::after {
+  content: 'Gráfico oculto no modo discreto';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  text-align: center;
+  color: var(--muted-foreground);
 }
 
 @layer base {

@@ -8,6 +8,14 @@ Recorrências mensais aparecem como **previsões** e não alteram o saldo até a
 
 Em **Seus dados e backup**, o usuário pode baixar as transações em CSV ou um JSON com todas as áreas financeiras e verificar/restaurar registros ausentes na mesma conta. Veja [o procedimento e as limitações](docs/backup-recovery.md).
 
+## Configurações do usuário
+
+A aba **Configurações** reúne tema escuro/claro/sistema, texto ampliado, redução de animações, modo discreto, área inicial, atualização automática das cotações e acesso ao perfil e segurança do Clerk. Também concentra **Seus dados e backup**.
+
+As preferências são salvas automaticamente em `user_preferences`, com uma linha por usuário autenticado. `GET/PUT /api/preferences` valida os campos e usa exclusivamente o proprietário da sessão; não aceita identidade enviada pelo navegador. Respostas não são armazenadas em cache compartilhado. A migração `0004_configuracoes_usuario.sql` é aditiva e deve ser aplicada antes de disponibilizar esta versão.
+
+O modo claro usa cores semânticas para inverter os fundos e textos da paleta Luxe, mantendo a identidade champagne. O modo discreto mascara textos monetários e gráficos dos painéis, mas **não** é um controle de acesso: formulários, mensagens livres do chat e arquivos exportados continuam contendo valores. As preferências não são incluídas no backup financeiro, e restaurar preferências não modifica lançamentos ou saldos.
+
 ## Arquitetura
 
 ```mermaid

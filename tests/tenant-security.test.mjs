@@ -54,6 +54,8 @@ const recurringConfirmRoute =
   await import('../app/api/recurring/confirm/route.ts');
 const simulationsRoute = await import('../app/api/simulations/route.ts');
 const assistantRoute = await import('../app/api/assistant/route.ts');
+const preferencesRoute = await import('../app/api/preferences/route.ts');
+const { defaultPreferences } = await import('../lib/user-preferences.ts');
 
 function normalizeSql(query) {
   let parameterIndex = 0;
@@ -98,13 +100,14 @@ function inMemoryAdapter(pg) {
   }
   return {
     prepare,
-    batch: (statements) => pg.transaction(async (transaction) => {
-      const results = [];
-      for (const statement of statements) {
-        results.push(await statement.runWith(transaction));
-      }
-      return results;
-    }),
+    batch: (statements) =>
+      pg.transaction(async (transaction) => {
+        const results = [];
+        for (const statement of statements) {
+          results.push(await statement.runWith(transaction));
+        }
+        return results;
+      }),
   };
 }
 
@@ -116,6 +119,7 @@ before(async () => {
     '0001_free_ronan.sql',
     '0002_reclassificar_aportes.sql',
     '0003_tiresome_gamora.sql',
+    '0004_configuracoes_usuario.sql',
   ]) {
     const migration = readFileSync(join(projectRoot, 'drizzle', file), 'utf8');
     for (const statement of migration.split('--> statement-breakpoint')) {
@@ -132,7 +136,7 @@ beforeEach(async () => {
   await pg.exec(`TRUNCATE TABLE budgets, categories, credit_card_invoices,
     credit_card_transactions, credit_cards, investment_contributions,
     investment_wallets, investments, saved_simulations, transactions,
-    recurring_rules RESTART IDENTITY CASCADE`);
+    recurring_rules, user_preferences RESTART IDENTITY CASCADE`);
 });
 
 test('handler returns 401 without authentication', async () => {
@@ -152,6 +156,130 @@ function jsonRequest(path, method, body) {
   };
   return new Request(`https://local.test${path}`, options);
 }
+
+test('settings require authentication for reads and writes', async () => {
+  assert.equal((await preferencesRoute.GET()).status, 401);
+  assert.equal(
+    (
+      await preferencesRoute.PUT(
+        jsonRequest('/api/preferences', 'PUT', defaultPreferences),
+      )
+    ).status,
+    401,
+  );
+});
+
+test('settings persist per owner without touching financial data', async () => {
+  currentOwner = 'user-a';
+  const original = await preferencesRoute.GET();
+  assert.equal(original.headers.get('cache-control'), 'private, no-store');
+  assert.deepEqual((await original.json()).preferences, defaultPreferences);
+  assert.equal(
+    (await pg.query('SELECT * FROM user_preferences')).rows.length,
+    0,
+  );
+  await pg.exec(`INSERT INTO investment_wallets (owner_id, balance_cents, created_at, updated_at)
+    VALUES ('user-a', 12345, '2026-09-30', '2026-09-30')`);
+  const updated = {
+    ...defaultPreferences,
+    theme: 'light',
+    hideBalances: true,
+    defaultArea: 'investments',
+    marketAutoRefresh: false,
+  };
+  assert.equal(
+    (
+      await preferencesRoute.PUT(
+        jsonRequest('/api/preferences', 'PUT', updated),
+      )
+    ).status,
+    200,
+  );
+  assert.deepEqual(
+    (await (await preferencesRoute.GET()).json()).preferences,
+    updated,
+  );
+  currentOwner = 'user-b';
+  assert.deepEqual(
+    (await (await preferencesRoute.GET()).json()).preferences,
+    defaultPreferences,
+  );
+  await preferencesRoute.PUT(
+    jsonRequest('/api/preferences', 'PUT', {
+      ...defaultPreferences,
+      largeText: true,
+    }),
+  );
+  currentOwner = 'user-a';
+  assert.deepEqual(
+    (await (await preferencesRoute.GET()).json()).preferences,
+    updated,
+  );
+  await preferencesRoute.PUT(
+    jsonRequest('/api/preferences', 'PUT', defaultPreferences),
+  );
+  assert.deepEqual(
+    (await (await preferencesRoute.GET()).json()).preferences,
+    defaultPreferences,
+  );
+  const wallet = (
+    await pg.query(
+      "SELECT balance_cents FROM investment_wallets WHERE owner_id = 'user-a'",
+    )
+  ).rows[0];
+  assert.equal(wallet.balance_cents, 12345);
+  assert.equal(
+    (await pg.query('SELECT * FROM user_preferences')).rows.length,
+    2,
+  );
+});
+
+test('settings reject identity injection, invalid values and broken JSON', async () => {
+  currentOwner = 'user-a';
+  for (const payload of [
+    null,
+    [],
+    {},
+    { ...defaultPreferences, owner_id: 'user-b' },
+    { ...defaultPreferences, theme: 'sepia' },
+    { ...defaultPreferences, hideBalances: 'false' },
+    { ...defaultPreferences, defaultArea: 'admin' },
+    { ...defaultPreferences, largeText: 1 },
+  ]) {
+    assert.equal(
+      (
+        await preferencesRoute.PUT(
+          jsonRequest('/api/preferences', 'PUT', payload),
+        )
+      ).status,
+      400,
+    );
+  }
+  assert.equal(
+    (
+      await preferencesRoute.PUT(
+        new Request('https://local.test/api/preferences', {
+          method: 'PUT',
+          body: '{broken',
+        }),
+      )
+    ).status,
+    400,
+  );
+  const foreignOrigin = new Request('https://local.test/api/preferences', {
+    method: 'PUT',
+    headers: {
+      origin: 'https://evil.test',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(defaultPreferences),
+  });
+  assert.equal((await preferencesRoute.PUT(foreignOrigin)).status, 403);
+  assert.equal(
+    (await pg.query('SELECT * FROM user_preferences')).rows.length,
+    0,
+  );
+});
 
 async function categoryIds() {
   currentOwner = 'test-owner-a';

@@ -140,33 +140,33 @@ export function AssistantPanel() {
     <section className="mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <Badge className="mb-3 border border-white/20 bg-white/10 text-white">
+          <Badge className="mb-3 border border-foreground/20 bg-inverse/10 text-foreground">
             <Sparkles className="size-3.5" /> Inteligência financeira
           </Badge>
           <h1 className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
             Assistente Meu Caixa
           </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-foreground/70">
             Pergunte sobre seus dados, encontre recursos do aplicativo ou monte
             um plano financeiro com cálculos claros.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#212F52]/75 px-3 py-2 text-xs text-white/75">
-          <ShieldCheck className="size-4 text-white" />
+        <div className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-card/75 px-3 py-2 text-xs text-foreground/75">
+          <ShieldCheck className="size-4 text-foreground" />
           Dados isolados por usuário
         </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_310px]">
-        <Card className="overflow-hidden border-white/15 bg-[#212F52]/90 text-white shadow-2xl shadow-black/20">
-          <CardHeader className="border-b border-white/10 bg-white/[0.035]">
+        <Card className="overflow-hidden border-foreground/15 bg-card/90 text-foreground shadow-2xl shadow-black/20">
+          <CardHeader className="border-b border-foreground/10 bg-inverse/[0.035]">
             <div className="flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-[#EEE6DB] to-[#D2B589] text-[#0B0B0D] shadow-lg shadow-black/20">
                 <Bot className="size-5" />
               </span>
               <div>
                 <CardTitle className="text-base">Conversa financeira</CardTitle>
-                <p className="mt-0.5 text-xs text-white/60">
+                <p className="mt-0.5 text-xs text-foreground/60">
                   Consulta os dados atualizados a cada pergunta
                 </p>
               </div>
@@ -188,7 +188,7 @@ export function AssistantPanel() {
                     className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     {message.role === 'assistant' ? (
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10 text-white">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-inverse/10 text-foreground">
                         <Bot className="size-4" />
                       </span>
                     ) : null}
@@ -196,13 +196,13 @@ export function AssistantPanel() {
                       className={`min-w-0 max-w-[85%] break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm sm:max-w-[75%] ${
                         message.role === 'user'
                           ? 'rounded-br-md bg-gradient-to-br from-[#EEE6DB] to-[#D2B589] text-[#0B0B0D]'
-                          : 'rounded-bl-md border border-white/10 bg-white/[0.065] text-white/90'
+                          : 'rounded-bl-md border border-foreground/10 bg-inverse/[0.065] text-foreground/90'
                       }`}
                     >
                       {message.content}
                     </div>
                     {message.role === 'user' ? (
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white text-[#212F52]">
+                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-inverse text-inverse-foreground">
                         <UserRound className="size-4" />
                       </span>
                     ) : null}
@@ -211,14 +211,14 @@ export function AssistantPanel() {
 
                 {sending ? (
                   <div className="flex items-end gap-2">
-                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-white/10">
+                    <span className="grid size-8 shrink-0 place-items-center rounded-full bg-inverse/10">
                       <Bot className="size-4" />
                     </span>
-                    <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/[0.065] px-4 py-3 text-sm text-white/65">
+                    <div className="rounded-2xl rounded-bl-md border border-foreground/10 bg-inverse/[0.065] px-4 py-3 text-sm text-foreground/65">
                       <span className="mr-2 inline-flex gap-1 align-middle">
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB] [animation-delay:-.3s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB] [animation-delay:-.15s]" />
-                        <span className="size-1.5 animate-bounce rounded-full bg-[#EEE6DB]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-foreground [animation-delay:-.3s]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-foreground [animation-delay:-.15s]" />
+                        <span className="size-1.5 animate-bounce rounded-full bg-foreground" />
                       </span>
                       A IA está digitando...
                     </div>
@@ -232,12 +232,12 @@ export function AssistantPanel() {
                 event.preventDefault();
                 void sendMessage(draft);
               }}
-              className="border-t border-white/10 bg-black/10 p-4 sm:p-5"
+              className="border-t border-foreground/10 bg-black/10 p-4 sm:p-5"
             >
               {error ? (
                 <p
                   role="alert"
-                  className="mb-3 rounded-lg border border-red-300/25 bg-red-950/30 px-3 py-2 text-xs text-red-100"
+                  className="mb-3 rounded-lg border border-red-300/25 bg-destructive/10 px-3 py-2 text-xs text-destructive"
                 >
                   {error}
                 </p>
@@ -252,14 +252,14 @@ export function AssistantPanel() {
                   disabled={sending}
                   placeholder="Ex.: Onde gastei mais este mês?"
                   aria-label="Mensagem para a assistente"
-                  className="max-h-36 min-h-14 resize-none border-white/15 bg-[#121B31] px-4 py-3 text-white placeholder:text-white/40"
+                  className="max-h-36 min-h-14 resize-none border-foreground/15 bg-background px-4 py-3 text-foreground placeholder:text-foreground/40"
                 />
                 <Button
                   type="submit"
                   size="icon"
                   disabled={sending || !draft.trim()}
                   aria-label="Enviar mensagem"
-                  className="size-12 shrink-0 bg-white text-[#212F52] hover:bg-white/85"
+                  className="size-12 shrink-0 bg-inverse text-inverse-foreground hover:bg-inverse/85"
                 >
                   {sending ? (
                     <LoaderCircle className="animate-spin" />
@@ -268,11 +268,11 @@ export function AssistantPanel() {
                   )}
                 </Button>
               </div>
-              <p className="mt-2 text-[11px] text-white/45">
+              <p className="mt-2 text-[11px] text-foreground/45">
                 Enter envia · Shift + Enter quebra a linha · Planejamento
                 educativo, não recomendação de investimento.
               </p>
-              <p className="mt-1 text-[11px] text-white/45">
+              <p className="mt-1 text-[11px] text-foreground/45">
                 Ao perguntar, os dados financeiros relevantes são processados
                 pelo Cloudflare Workers AI para gerar a resposta.
               </p>
@@ -281,7 +281,7 @@ export function AssistantPanel() {
         </Card>
 
         <aside className="space-y-5">
-          <Card className="border-white/15 bg-[#212F52]/80 text-white">
+          <Card className="border-foreground/15 bg-card/80 text-foreground">
             <CardHeader>
               <CardTitle className="text-base">O que posso fazer</CardTitle>
             </CardHeader>
@@ -304,7 +304,7 @@ export function AssistantPanel() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/15 bg-[#212F52]/80 text-white">
+          <Card className="border-foreground/15 bg-card/80 text-foreground">
             <CardHeader>
               <CardTitle className="text-base">Perguntas rápidas</CardTitle>
             </CardHeader>
@@ -315,7 +315,7 @@ export function AssistantPanel() {
                   type="button"
                   disabled={sending}
                   onClick={() => void sendMessage(suggestion)}
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-left text-xs leading-5 text-white/75 transition hover:border-[#EEE6DB]/60 hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-xl border border-foreground/10 bg-inverse/[0.045] px-3 py-2.5 text-left text-xs leading-5 text-foreground/75 transition hover:border-foreground/60 hover:bg-inverse/[0.08] hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {suggestion}
                 </button>
@@ -339,12 +339,14 @@ function Capability({
 }) {
   return (
     <div className="flex gap-3">
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-white/10 text-[#E9E6E1] [&_svg]:size-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-inverse/10 text-foreground [&_svg]:size-4">
         {icon}
       </span>
       <div>
-        <p className="font-medium text-white">{title}</p>
-        <p className="mt-0.5 text-xs leading-5 text-white/55">{description}</p>
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="mt-0.5 text-xs leading-5 text-foreground/55">
+          {description}
+        </p>
       </div>
     </div>
   );

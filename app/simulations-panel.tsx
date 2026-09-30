@@ -1,4 +1,5 @@
 'use client';
+import { useMoneyFormatter, usePreferences } from './preferences-provider';
 import { parseCurrencyToCents, parseDecimal } from '@/lib/frontend-input';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
@@ -50,20 +51,11 @@ type SavedSimulation = {
   updatedAt: string;
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
-
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: 'short',
   year: 'numeric',
 });
-
-function formatCurrency(cents: number) {
-  return currencyFormatter.format(cents / 100);
-}
 
 function formatCurrencyInput(cents: number) {
   return (cents / 100).toFixed(2).replace('.', ',');
@@ -85,6 +77,7 @@ function numberFrom(value: unknown, fallback = 0) {
 }
 
 export function SimulationsPanel() {
+  const formatCurrency = useMoneyFormatter();
   const [debtPrincipal, setDebtPrincipal] = useState('2.500,00');
   const [debtRate, setDebtRate] = useState('14,00');
   const [debtMonths, setDebtMonths] = useState('12');
@@ -274,27 +267,27 @@ export function SimulationsPanel() {
 
   return (
     <section className="min-h-[calc(100vh-81px)] pb-16">
-      <header className="border-b border-white/15 text-white">
+      <header className="border-b border-foreground/15 text-foreground">
         <div className="mx-auto flex max-w-7xl flex-wrap items-end justify-between gap-4 px-5 pb-8 pt-8 sm:px-8 lg:px-10">
           <div>
-            <p className="mb-1 text-sm font-medium text-white/80">
+            <p className="mb-1 text-sm font-medium text-foreground/80">
               Simulação real
             </p>
             <h1 className="text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
               Projete antes de decidir
             </h1>
           </div>
-          <Badge className="border border-white/15 bg-[#212F52]/80 text-white">
+          <Badge className="border border-foreground/15 bg-card/80 text-foreground">
             Juros compostos · evolução mensal
           </Badge>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 xl:grid-cols-2 lg:px-10">
-        <Card className="overflow-hidden border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
-          <CardHeader className="border-b border-white/10 pb-4">
+        <Card className="overflow-hidden border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
+          <CardHeader className="border-b border-foreground/10 pb-4">
             <CardTitle className="flex items-center gap-2 text-xl font-bold tracking-tight">
-              <span className="grid size-9 place-items-center rounded-xl bg-red-500/15 text-red-300">
+              <span className="grid size-9 place-items-center rounded-xl bg-red-500/15 text-destructive">
                 <CreditCard className="size-5" />
               </span>
               Dívida no rotativo
@@ -329,7 +322,7 @@ export function SimulationsPanel() {
             </div>
 
             {!debtValid && (
-              <p role="alert" className="text-sm text-red-200">
+              <p role="alert" className="text-sm text-destructive">
                 Informe uma fatura positiva, juros de 0 a 100% e de 1 a 120
                 meses. Valores que excedam a precisão dos cálculos não podem ser
                 simulados.
@@ -378,10 +371,10 @@ export function SimulationsPanel() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
-          <CardHeader className="border-b border-white/10 pb-4">
+        <Card className="overflow-hidden border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
+          <CardHeader className="border-b border-foreground/10 pb-4">
             <CardTitle className="flex items-center gap-2 text-xl font-bold tracking-tight">
-              <span className="grid size-9 place-items-center rounded-xl bg-white/10 text-white">
+              <span className="grid size-9 place-items-center rounded-xl bg-inverse/10 text-foreground">
                 <PiggyBank className="size-5" />
               </span>
               Investimento x gasto futuro
@@ -455,7 +448,7 @@ export function SimulationsPanel() {
             </div>
 
             {!investmentValid && (
-              <p role="alert" className="text-sm text-red-200">
+              <p role="alert" className="text-sm text-destructive">
                 Informe valores válidos, um valor inicial ou aporte positivo,
                 rendimento de 0 a 100% e prazo de até 600 meses (50 anos).
                 Valores que excedam a precisão dos cálculos não podem ser
@@ -527,8 +520,8 @@ export function SimulationsPanel() {
             aria-live="polite"
             className={`mb-6 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
               error
-                ? 'border-red-400/20 bg-red-950/70 text-red-200'
-                : 'border-white/15 bg-white/10 text-white'
+                ? 'border-red-400/20 bg-destructive/10 text-destructive'
+                : 'border-foreground/15 bg-inverse/10 text-foreground'
             }`}
           >
             {error && <AlertCircle className="mt-0.5 size-4 shrink-0" />}
@@ -536,10 +529,10 @@ export function SimulationsPanel() {
           </output>
         )}
 
-        <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-          <CardHeader className="border-b border-white/10 pb-4">
+        <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+          <CardHeader className="border-b border-foreground/10 pb-4">
             <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <FolderHeart className="size-5 text-white" />
+              <FolderHeart className="size-5 text-foreground" />
               Cenários salvos
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -561,7 +554,7 @@ export function SimulationsPanel() {
             ) : savedSimulations.length === 0 ? (
               <div className="grid min-h-28 place-items-center text-center">
                 <div>
-                  <FolderHeart className="mx-auto mb-2 size-8 text-white/60" />
+                  <FolderHeart className="mx-auto mb-2 size-8 text-foreground/60" />
                   <p className="font-semibold">Nenhum cenário salvo</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Ajuste os valores acima e salve sua primeira projeção.
@@ -573,7 +566,7 @@ export function SimulationsPanel() {
                 {savedSimulations.map((simulation) => (
                   <article
                     key={simulation.id}
-                    className="rounded-xl border border-white/10 bg-white/5 p-4"
+                    className="rounded-xl border border-foreground/10 bg-inverse/5 p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -587,8 +580,8 @@ export function SimulationsPanel() {
                       <Badge
                         className={
                           simulation.simulationType === 'debt'
-                            ? 'bg-red-500/15 text-red-200'
-                            : 'bg-white/10 text-white'
+                            ? 'bg-red-500/15 text-destructive'
+                            : 'bg-inverse/10 text-foreground'
                         }
                       >
                         {simulation.simulationType === 'debt'
@@ -685,16 +678,18 @@ function ResultCard({
       className={`rounded-xl border p-4 ${
         danger
           ? 'border-red-400/20 bg-red-500/10'
-          : 'border-white/10 bg-white/5'
+          : 'border-foreground/10 bg-inverse/5'
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{label}</p>
-        <span className={danger ? 'text-red-300' : 'text-white'}>{icon}</span>
+        <span className={danger ? 'text-destructive' : 'text-foreground'}>
+          {icon}
+        </span>
       </div>
       <p
         className={`mt-3 text-xl font-bold tracking-tight tabular-nums ${
-          danger ? 'text-red-200' : 'text-white'
+          danger ? 'text-destructive' : 'text-foreground'
         }`}
       >
         {value}
@@ -720,6 +715,8 @@ function CurveChart({
   ariaLabel: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const formatCurrency = useMoneyFormatter();
+  const { resolvedTheme, motionReduced } = usePreferences();
   const [chartError, setChartError] = useState('');
 
   useEffect(() => {
@@ -752,12 +749,22 @@ function CurveChart({
             Legend,
             Filler,
           );
+          const style = getComputedStyle(document.documentElement);
+          const textColor = style.getPropertyValue('--foreground').trim();
+          const mutedColor = style
+            .getPropertyValue('--muted-foreground')
+            .trim();
+          const borderColor = style.getPropertyValue('--border').trim();
+          const curveColor =
+            color === '#ffffff'
+              ? style.getPropertyValue('--chart-2').trim()
+              : color;
           const datasets = [
             {
               label,
               data: points.map((point) => point.valueCents),
-              borderColor: color,
-              backgroundColor: `${color}22`,
+              borderColor: curveColor,
+              backgroundColor: `${curveColor}22`,
               borderWidth: 3,
               pointRadius: 0,
               pointHoverRadius: 4,
@@ -770,8 +777,8 @@ function CurveChart({
             datasets.push({
               label: targetLabel ?? 'Gasto futuro',
               data: points.map(() => targetCents),
-              borderColor: '#EEE6DB',
-              backgroundColor: '#EEE6DB11',
+              borderColor: textColor,
+              backgroundColor: 'transparent',
               borderWidth: 2,
               pointRadius: 0,
               pointHoverRadius: 0,
@@ -792,12 +799,12 @@ function CurveChart({
             options: {
               responsive: true,
               maintainAspectRatio: false,
-              animation: { duration: 220 },
+              animation: motionReduced ? false : { duration: 220 },
               interaction: { intersect: false, mode: 'index' },
               plugins: {
                 legend: {
                   labels: {
-                    color: '#EEE6DB',
+                    color: textColor,
                     usePointStyle: true,
                     boxWidth: 8,
                   },
@@ -811,14 +818,14 @@ function CurveChart({
               },
               scales: {
                 x: {
-                  grid: { color: 'rgba(255,255,255,.05)' },
-                  ticks: { color: '#BFC7D3', maxTicksLimit: 7 },
+                  grid: { color: borderColor },
+                  ticks: { color: mutedColor, maxTicksLimit: 7 },
                 },
                 y: {
                   beginAtZero: true,
-                  grid: { color: 'rgba(255,255,255,.08)' },
+                  grid: { color: borderColor },
                   ticks: {
-                    color: '#BFC7D3',
+                    color: mutedColor,
                     callback: (value) => formatCurrency(Number(value)),
                   },
                 },
@@ -838,12 +845,22 @@ function CurveChart({
       active = false;
       chart?.destroy();
     };
-  }, [color, label, points, targetCents, targetLabel]);
+  }, [
+    color,
+    label,
+    points,
+    targetCents,
+    targetLabel,
+    resolvedTheme,
+    motionReduced,
+    formatCurrency,
+  ]);
 
   return (
     <figure
+      data-private-chart="true"
       aria-label={ariaLabel}
-      className="h-64 rounded-xl border border-white/10 bg-[#18243F] p-3"
+      className="h-64 rounded-xl border border-foreground/10 bg-popover p-3"
     >
       {points.length === 0 ? (
         <output
@@ -878,7 +895,7 @@ function SaveScenario({
   onSave: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-white/10 bg-white/5 p-3 sm:flex-row sm:items-end">
+    <div className="flex flex-col gap-3 rounded-xl border border-foreground/10 bg-inverse/5 p-3 sm:flex-row sm:items-end">
       <div className="min-w-0 flex-1 space-y-2">
         <Label htmlFor={inputId}>Nome do cenário</Label>
         <Input
@@ -893,7 +910,7 @@ function SaveScenario({
         type="button"
         disabled={disabled || name.trim().length < 2}
         onClick={onSave}
-        className="bg-[#D2B589] font-semibold text-[#0B0B0D] hover:bg-[#BD9B69]"
+        className="bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
       >
         {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
         {saving ? 'Salvando...' : 'Salvar cenário'}

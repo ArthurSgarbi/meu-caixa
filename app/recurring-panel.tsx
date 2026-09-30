@@ -1,4 +1,5 @@
 'use client';
+import { useMoneyFormatter } from './preferences-provider';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
 
@@ -46,16 +47,11 @@ type RecurringResponse = {
   error?: string;
 };
 
-const money = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
 const monthLabel = new Intl.DateTimeFormat('pt-BR', {
   month: 'short',
   year: 'numeric',
   timeZone: 'UTC',
 });
-const formatMoney = (cents: number) => money.format(cents / 100);
 const formatMonth = (month: string) =>
   monthLabel.format(new Date(`${month}-01T12:00:00Z`));
 
@@ -70,6 +66,7 @@ export function RecurringPanel({
   refreshKey: number;
   onConfirmed: () => Promise<void>;
 }) {
+  const formatMoney = useMoneyFormatter();
   const [data, setData] = useState<RecurringResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -224,8 +221,8 @@ export function RecurringPanel({
       className="mx-auto max-w-7xl px-5 pb-8 sm:px-8 lg:px-10"
       aria-label="Recorrências e previsão de caixa"
     >
-      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-        <CardHeader className="border-b border-white/10 pb-4">
+      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+        <CardHeader className="border-b border-foreground/10 pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-bold">
             <CalendarClock className="size-5 text-primary" /> Recorrências e
             previsão de caixa
@@ -327,7 +324,7 @@ export function RecurringPanel({
           {(error || message) && (
             <output
               aria-live="polite"
-              className={`flex items-center gap-2 text-sm ${error ? 'text-red-200' : 'text-white'}`}
+              className={`flex items-center gap-2 text-sm ${error ? 'text-destructive' : 'text-foreground'}`}
             >
               {error && <AlertCircle className="size-4" />}
               {error || message}
@@ -349,14 +346,14 @@ export function RecurringPanel({
                   Lançamentos previstos em {formatMonth(month)}
                 </h3>
                 {!data?.occurrences.length ? (
-                  <p className="rounded-lg border border-dashed border-white/20 p-4 text-sm text-muted-foreground">
+                  <p className="rounded-lg border border-dashed border-foreground/20 p-4 text-sm text-muted-foreground">
                     Nenhuma recorrência prevista neste mês.
                   </p>
                 ) : (
                   data.occurrences.map((item) => (
                     <div
                       key={`${item.id}:${item.date}`}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/5 p-4"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/15 bg-inverse/5 p-4"
                     >
                       <div>
                         <p className="font-medium">
@@ -399,7 +396,7 @@ export function RecurringPanel({
                   {data?.forecast.map((item) => (
                     <div
                       key={item.month}
-                      className="rounded-xl border border-white/15 bg-white/5 p-4"
+                      className="rounded-xl border border-foreground/15 bg-inverse/5 p-4"
                     >
                       <p className="text-sm text-muted-foreground">
                         {formatMonth(item.month)}
@@ -425,7 +422,7 @@ export function RecurringPanel({
                   data.rules.map((rule) => (
                     <div
                       key={rule.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 p-3"
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-foreground/15 p-3"
                     >
                       <div>
                         <p className="font-medium">

@@ -31,6 +31,7 @@ import {
   PiggyBank,
   Plus,
   ReceiptText,
+  Settings,
   ShieldCheck,
   Target,
   UserPlus,
@@ -67,7 +68,8 @@ import { useLatestRequest } from '@/hooks/use-latest-request';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
 import { CreditCardsPanel } from './credit-cards-panel';
-import { DataToolsPanel } from './data-tools-panel';
+import { SettingsPanel } from './settings-panel';
+import { useMoneyFormatter, usePreferences } from './preferences-provider';
 import { InvestmentsPanel } from './investments-panel';
 import { RecurringPanel } from './recurring-panel';
 import { SimulationsPanel } from './simulations-panel';
@@ -156,11 +158,6 @@ const emptyData: FinanceData = {
   },
 };
 
-const currencyFormatter = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-});
-
 const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
   month: 'short',
@@ -172,10 +169,6 @@ const monthFormatter = new Intl.DateTimeFormat('pt-BR', {
   year: 'numeric',
   timeZone: 'UTC',
 });
-
-function formatCurrency(cents: number) {
-  return currencyFormatter.format(cents / 100);
-}
 
 function formatCurrencyInput(cents: number) {
   return (cents / 100).toFixed(2).replace('.', ',');
@@ -236,6 +229,13 @@ function validateToolInput(input: unknown): CreateTransactionInput {
 }
 
 export default function Home() {
+  const formatCurrency = useMoneyFormatter();
+  const {
+    preferences,
+    loading: preferencesLoading,
+    error: preferencesError,
+  } = usePreferences();
+  const [activeArea, setActiveArea] = useState<string | null>(null);
   const { signOut } = useClerk();
   const [session, setSession] = useState<SessionData | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
@@ -616,9 +616,9 @@ export default function Home() {
 
   if (sessionLoading) {
     return (
-      <main className="brand-luxe grid min-h-screen place-items-center text-white">
+      <main className="brand-luxe grid min-h-screen place-items-center text-foreground">
         <div className="text-center">
-          <LoaderCircle className="mx-auto size-8 animate-spin text-white" />
+          <LoaderCircle className="mx-auto size-8 animate-spin text-foreground" />
           <p className="mt-3 text-sm text-slate-300">
             Protegendo seus dados...
           </p>
@@ -642,25 +642,29 @@ export default function Home() {
   }
 
   return (
-    <main className="brand-luxe min-h-screen text-white">
+    <main className="brand-luxe min-h-screen text-foreground">
       <Tabs
-        defaultValue="expenses"
+        value={
+          activeArea ??
+          (preferencesLoading ? 'expenses' : preferences.defaultArea)
+        }
         onValueChange={(value) => {
+          setActiveArea(value);
           if (value === 'assistant') setAssistantVisited(true);
         }}
         className="gap-0"
       >
-        <nav className="border-b border-white/15 text-white">
+        <nav className="border-b border-foreground/15 text-foreground">
           <div className="mx-auto flex max-w-7xl min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-10">
             <div className="flex items-center gap-3">
-              <span className="grid size-10 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
+              <span className="grid size-10 place-items-center rounded-xl bg-inverse text-inverse-foreground shadow-[0_8px_24px_rgba(255,255,255,.2)]">
                 <CircleDollarSign className="size-5" aria-hidden="true" />
               </span>
               <div>
                 <p className="text-lg font-bold tracking-[-0.03em]">
                   Meu Caixa
                 </p>
-                <p className="text-xs text-white/75">
+                <p className="text-xs text-foreground/75">
                   Controle financeiro pessoal
                 </p>
               </div>
@@ -668,48 +672,54 @@ export default function Home() {
             <div className="flex w-full min-w-0 flex-col-reverse items-stretch gap-3 lg:w-auto lg:flex-1 lg:flex-row lg:items-center lg:justify-end">
               <TabsList
                 aria-label="Áreas do Meu Caixa"
-                className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-white/15 bg-[#212F52]/80 p-1 sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0 [&>[data-slot=tabs-trigger]:last-child]:col-span-2"
+                className="grid h-auto w-full min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-foreground/15 bg-card/80 p-1 sm:flex sm:flex-wrap [&>[data-slot=tabs-trigger]]:min-w-0 "
               >
                 <TabsTrigger
                   value="expenses"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <ReceiptText /> Gastos
                 </TabsTrigger>
                 <TabsTrigger
                   value="investments"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <PiggyBank /> Investimentos
                 </TabsTrigger>
                 <TabsTrigger
                   value="credit-cards"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <CreditCard /> Cartões
                 </TabsTrigger>
                 <TabsTrigger
                   value="simulations"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <ChartNoAxesCombined /> Simulações
                 </TabsTrigger>
                 <TabsTrigger
                   value="assistant"
-                  className="h-9 flex-none px-3 text-white/75 data-active:bg-[#D2B589] data-active:text-[#0B0B0D] data-active:hover:text-[#0B0B0D] dark:data-active:bg-[#D2B589] dark:data-active:text-[#0B0B0D] dark:data-active:hover:text-[#0B0B0D] sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <Bot /> Assistente IA
                 </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground sm:px-4"
+                >
+                  <Settings /> Configurações
+                </TabsTrigger>
               </TabsList>
-              <div className="flex shrink-0 self-end items-center gap-2 rounded-xl border border-white/15 bg-[#212F52]/80 px-3 py-2 lg:self-auto">
-                <span className="grid size-7 place-items-center rounded-full bg-white text-xs font-bold text-black">
+              <div className="flex shrink-0 self-end items-center gap-2 rounded-xl border border-foreground/15 bg-card/80 px-3 py-2 lg:self-auto">
+                <span className="grid size-7 place-items-center rounded-full bg-inverse text-xs font-bold text-inverse-foreground">
                   {user.displayName.charAt(0).toUpperCase()}
                 </span>
                 <div className="hidden max-w-36 sm:block">
                   <p className="truncate text-xs font-semibold">
                     {user.displayName}
                   </p>
-                  <p className="truncate text-[11px] text-white/65">
+                  <p className="truncate text-[11px] text-foreground/65">
                     Conta protegida
                   </p>
                 </div>
@@ -719,7 +729,7 @@ export default function Home() {
                   aria-label="Sair da conta"
                   variant="ghost"
                   size="icon-sm"
-                  className="text-white/75 hover:bg-[#212F52]/80 hover:text-white"
+                  className="text-foreground/75 hover:bg-card/80 hover:text-foreground"
                 >
                   <LogOut />
                 </Button>
@@ -728,12 +738,26 @@ export default function Home() {
           </div>
         </nav>
 
+        {preferencesError && (
+          <div
+            role="alert"
+            className="mx-auto mt-4 flex max-w-7xl flex-wrap items-center gap-3 px-5 text-sm"
+          >
+            <span>
+              Não foi possível carregar as preferências. Os valores estão
+              ocultos por precaução.
+            </span>
+            <Button variant="outline" onClick={() => setActiveArea('settings')}>
+              Revisar configurações
+            </Button>
+          </div>
+        )}
         <TabsContent value="expenses" keepMounted className="pb-16">
-          <header className="border-b border-white/15 text-white">
+          <header className="border-b border-foreground/15 text-foreground">
             <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
               <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="mb-1 text-sm font-medium text-white">
+                  <p className="mb-1 text-sm font-medium text-foreground">
                     Visão mensal
                   </p>
                   <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
@@ -750,7 +774,7 @@ export default function Home() {
                         .getElementById('monthly-budgets')
                         ?.scrollIntoView({ behavior: 'smooth' })
                     }
-                    className="border border-white/15 bg-[#212F52]/80 text-white hover:bg-[#2E416B]"
+                    className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
                   >
                     <Target />
                     <span className="hidden md:inline">Orçamentos</span>
@@ -758,7 +782,7 @@ export default function Home() {
                   <Button
                     type="button"
                     onClick={() => void openInvestmentTransfer()}
-                    className="mr-1 bg-white font-semibold text-black hover:bg-white/85"
+                    className="mr-1 bg-inverse font-semibold text-inverse-foreground hover:bg-inverse/85"
                   >
                     <PiggyBank />
                     <span className="hidden sm:inline">Novo investimento</span>
@@ -769,7 +793,7 @@ export default function Home() {
                     disabled={saving || editSaving || investmentTransferSaving}
                     size="icon"
                     onClick={() => changeMonth(-1)}
-                    className="border border-white/15 bg-[#212F52]/80 text-white hover:bg-[#2E416B]"
+                    className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
                   >
                     <ChevronLeft />
                   </Button>
@@ -778,7 +802,7 @@ export default function Home() {
                     disabled={saving || editSaving || investmentTransferSaving}
                     size="icon"
                     onClick={() => changeMonth(1)}
-                    className="border border-white/15 bg-[#212F52]/80 text-white hover:bg-[#2E416B]"
+                    className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
                   >
                     <ChevronRight />
                   </Button>
@@ -830,8 +854,8 @@ export default function Home() {
           </header>
 
           <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-            <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-white/15">
-              <CardHeader className="border-b border-white/10 pb-4">
+            <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
+              <CardHeader className="border-b border-foreground/10 pb-4">
                 <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
                   <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
                     <Plus className="size-4" />
@@ -922,7 +946,7 @@ export default function Home() {
                   {(message || error) && (
                     <output
                       aria-live="polite"
-                      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-red-950/70 text-red-200' : 'bg-white/10 text-white'}`}
+                      className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-destructive/10 text-destructive' : 'bg-inverse/10 text-foreground'}`}
                     >
                       {error && (
                         <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -948,8 +972,8 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-              <CardHeader className="flex-row items-center justify-between border-b border-white/10 pb-4">
+            <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+              <CardHeader className="flex-row items-center justify-between border-b border-foreground/10 pb-4">
                 <div>
                   <CardTitle className="text-lg font-bold tracking-tight">
                     Movimentações
@@ -992,7 +1016,7 @@ export default function Home() {
                 ) : data.transactions.length === 0 ? (
                   <div className="grid min-h-60 place-items-center px-6 text-center">
                     <div>
-                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-white/10 text-white">
+                      <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-inverse/10 text-foreground">
                         <ReceiptText />
                       </span>
                       <p className="font-semibold">
@@ -1036,7 +1060,7 @@ export default function Home() {
                                 : transaction.categoryName}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-semibold text-white tabular-nums">
+                          <TableCell className="text-right font-semibold text-foreground tabular-nums">
                             {transaction.type === 'income' ? '+ ' : '− '}
                             {formatCurrency(transaction.amountCents)}
                           </TableCell>
@@ -1080,11 +1104,11 @@ export default function Home() {
             }}
           />
 
-          <DataToolsPanel
-            onRestored={async () => {
-              await loadData(month);
-            }}
-          />
+          <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+            <Button variant="outline" onClick={() => setActiveArea('settings')}>
+              <Settings /> Configurações e backup dos dados
+            </Button>
+          </div>
 
           <Dialog
             open={investmentTransferOpen}
@@ -1140,7 +1164,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-muted-foreground">
+                <div className="rounded-xl border border-foreground/10 bg-inverse/5 p-3 text-sm text-muted-foreground">
                   Saldo principal disponível:{' '}
                   {investmentAvailableBalanceCents === null
                     ? 'consultando...'
@@ -1150,7 +1174,7 @@ export default function Home() {
                 {investmentTransferError && (
                   <output
                     aria-live="polite"
-                    className="flex items-start gap-2 rounded-lg bg-red-950/70 px-3 py-2.5 text-sm text-red-200"
+                    className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
                   >
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     {investmentTransferError}
@@ -1172,7 +1196,7 @@ export default function Home() {
                       investmentTransferSaving ||
                       investmentAvailableBalanceCents === null
                     }
-                    className="bg-[#D2B589] text-[#0B0B0D] hover:bg-[#BD9B69]"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     {investmentTransferSaving && (
                       <LoaderCircle className="animate-spin" />
@@ -1339,7 +1363,17 @@ export default function Home() {
         </TabsContent>
 
         <TabsContent value="assistant" keepMounted>
-          {assistantVisited && <AssistantPanel />}
+          {(assistantVisited || preferences.defaultArea === 'assistant') && (
+            <AssistantPanel />
+          )}
+        </TabsContent>
+        <TabsContent value="settings">
+          <SettingsPanel
+            onRestored={async () => {
+              await loadData(month);
+              setBudgetRefreshKey((value) => value + 1);
+            }}
+          />
         </TabsContent>
       </Tabs>
     </main>
@@ -1358,52 +1392,52 @@ function AuthScreen({
   onRetry: () => void;
 }) {
   return (
-    <main className="brand-luxe min-h-screen text-white">
+    <main className="brand-luxe min-h-screen text-foreground">
       <div className="mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1.05fr_.8fr] lg:px-10">
         <section>
           <div className="mb-9 flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-xl bg-white text-black shadow-[0_8px_24px_rgba(255,255,255,.2)]">
+            <span className="grid size-11 place-items-center rounded-xl bg-inverse text-inverse-foreground shadow-[0_8px_24px_rgba(255,255,255,.2)]">
               <CircleDollarSign className="size-6" aria-hidden="true" />
             </span>
             <div>
               <p className="text-xl font-bold tracking-[-0.03em]">Meu Caixa</p>
-              <p className="text-sm text-white/75">
+              <p className="text-sm text-foreground/75">
                 Suas finanças, somente suas
               </p>
             </div>
           </div>
 
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[.16em] text-white">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[.16em] text-foreground">
             Controle pessoal e seguro
           </p>
           <h1 className="max-w-xl text-4xl font-bold tracking-[-0.05em] sm:text-5xl">
             Cada pessoa acessa apenas o próprio caixa.
           </h1>
-          <p className="mt-5 max-w-lg text-base leading-7 text-white/80">
+          <p className="mt-5 max-w-lg text-base leading-7 text-foreground/80">
             Entre para registrar gastos, receitas e investimentos em uma área
             individual, protegida pela sua conta.
           </p>
 
           <div className="mt-8 grid max-w-lg gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-white/15 bg-[#212F52]/80 p-4">
-              <ShieldCheck className="mb-3 size-5 text-white" />
+            <div className="rounded-xl border border-foreground/15 bg-card/80 p-4">
+              <ShieldCheck className="mb-3 size-5 text-foreground" />
               <p className="font-semibold">Dados isolados</p>
-              <p className="mt-1 text-sm leading-6 text-white/70">
+              <p className="mt-1 text-sm leading-6 text-foreground/70">
                 Consultas e alterações são vinculadas à conta autenticada.
               </p>
             </div>
-            <div className="rounded-xl border border-white/15 bg-[#212F52]/80 p-4">
-              <LockKeyhole className="mb-3 size-5 text-white" />
+            <div className="rounded-xl border border-foreground/15 bg-card/80 p-4">
+              <LockKeyhole className="mb-3 size-5 text-foreground" />
               <p className="font-semibold">Senha fora do app</p>
-              <p className="mt-1 text-sm leading-6 text-white/70">
+              <p className="mt-1 text-sm leading-6 text-foreground/70">
                 A autenticação é feita pelo Clerk, sem armazenar sua senha.
               </p>
             </div>
           </div>
         </section>
 
-        <Card className="border-white/15 bg-[#18243F] text-white shadow-[0_30px_80px_rgba(0,0,0,.35)]">
-          <CardHeader className="border-b border-white/10 pb-5">
+        <Card className="border-foreground/15 bg-popover text-foreground shadow-[0_30px_80px_rgba(0,0,0,.35)]">
+          <CardHeader className="border-b border-foreground/10 pb-5">
             <CardTitle className="text-2xl font-bold tracking-[-0.04em]">
               Acesse seu espaço
             </CardTitle>
@@ -1480,9 +1514,9 @@ function SummaryCard({
   loading: boolean;
 }) {
   const styles = {
-    positive: 'border-white/25 bg-white/10 text-white',
-    negative: 'border-white/15 bg-[#212F52]/70 text-white',
-    balance: 'border-white/15 bg-[#212F52]/80 text-white',
+    positive: 'border-foreground/25 bg-inverse/10 text-foreground',
+    negative: 'border-foreground/15 bg-card/70 text-foreground',
+    balance: 'border-foreground/15 bg-card/80 text-foreground',
   };
   return (
     <div className={`rounded-2xl border p-5 backdrop-blur-sm ${styles[tone]}`}>
@@ -1491,7 +1525,7 @@ function SummaryCard({
         <span className="[&_svg]:size-5">{icon}</span>
       </div>
       <p
-        className={`text-2xl font-bold tracking-[-0.035em] text-white tabular-nums ${loading ? 'animate-pulse opacity-50' : ''}`}
+        className={`text-2xl font-bold tracking-[-0.035em] text-foreground tabular-nums ${loading ? 'animate-pulse opacity-50' : ''}`}
       >
         {loading ? 'R$ —' : value}
       </p>

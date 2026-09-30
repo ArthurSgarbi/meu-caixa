@@ -160,8 +160,8 @@ export function DataToolsPanel({
       className="mx-auto max-w-7xl px-5 pb-8 sm:px-8 lg:px-10"
       aria-label="Exportação e recuperação de dados"
     >
-      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-white/15">
-        <CardHeader className="border-b border-white/10 pb-4">
+      <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+        <CardHeader className="border-b border-foreground/10 pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-bold">
             <ShieldCheck className="size-5 text-primary" /> Seus dados e backup
           </CardTitle>
@@ -211,7 +211,7 @@ export function DataToolsPanel({
             </p>
           </div>
           {preview && (
-            <div className="space-y-3 rounded-xl border border-white/15 bg-white/5 p-4">
+            <div className="space-y-3 rounded-xl border border-foreground/15 bg-inverse/5 p-4">
               <p className="font-semibold">
                 Prévia: {preview.totalMissing} registros ausentes
               </p>
@@ -236,7 +236,7 @@ export function DataToolsPanel({
           {(error || message) && (
             <output
               aria-live="polite"
-              className={`flex items-center gap-2 text-sm ${error ? 'text-red-200' : 'text-white'}`}
+              className={`flex items-center gap-2 text-sm ${error ? 'text-destructive' : 'text-foreground'}`}
             >
               {error ? (
                 <AlertCircle className="size-4" />
