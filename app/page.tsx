@@ -713,7 +713,7 @@ export default function Home() {
                   aria-controls="settings-panel"
                   aria-pressed={activeArea === 'settings'}
                   onClick={() => setActiveArea('settings')}
-                  className="h-10 shrink-0 rounded-xl border-foreground/15 bg-card/80 px-3 text-foreground/75 hover:bg-card hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground"
+                  className="h-10 shrink-0 rounded-xl border-foreground/15 bg-card/80 px-3 text-foreground/75 hover:bg-card hover:text-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary aria-pressed:hover:text-primary-foreground dark:bg-card/80 dark:hover:bg-card dark:aria-pressed:bg-primary dark:aria-pressed:text-primary-foreground dark:aria-pressed:hover:bg-primary dark:aria-pressed:hover:text-primary-foreground"
                 >
                   <Settings aria-hidden="true" /> Configurações
                 </Button>
