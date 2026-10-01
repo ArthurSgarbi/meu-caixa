@@ -693,7 +693,7 @@ export default function Home() {
               >
                 <TabsTrigger
                   value="overview"
-                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground sm:px-4"
+                  className="h-9 flex-none px-3 text-foreground/75 data-active:bg-primary data-active:text-primary-foreground data-active:hover:text-primary-foreground dark:data-active:bg-primary dark:data-active:text-primary-foreground dark:data-active:hover:text-primary-foreground sm:px-4"
                 >
                   <LayoutDashboard /> Visão Geral
                 </TabsTrigger>
