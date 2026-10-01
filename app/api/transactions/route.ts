@@ -3,6 +3,9 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { seedCategories } from '@/lib/finance-categories';
 import { calculateMonthlyAccountChangeCents } from '@/lib/finance-calculations';
 import { getMonthRange } from '@/lib/finance-month';
+import { accountIsValid, ownerLock } from '@/lib/accounts-server';
+import { parseAccountId } from '@/lib/accounts-goals';
+import { isValidDate } from '@/lib/recurring';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +17,7 @@ type TransactionInput = {
   amountCents: number;
   transactionDate: string;
   categoryId: number;
+  accountId: number | null;
 };
 
 function parseTransactionInput(
@@ -26,6 +30,12 @@ function parseTransactionInput(
   const transactionDate =
     typeof body.transactionDate === 'string' ? body.transactionDate : '';
   const categoryId = Number(body.categoryId);
+  let accountId: number | null;
+  try {
+    accountId = parseAccountId(body.accountId);
+  } catch {
+    return { error: 'Selecione uma conta válida.' };
+  }
 
   if (description.length < 2 || description.length > 120) {
     return { error: 'Informe uma descrição entre 2 e 120 caracteres.' };
@@ -33,10 +43,14 @@ function parseTransactionInput(
   if (!['income', 'expense'].includes(type)) {
     return { error: 'Selecione um tipo de transação válido.' };
   }
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+  if (
+    !Number.isSafeInteger(amountCents) ||
+    amountCents <= 0 ||
+    amountCents > 2_147_483_647
+  ) {
     return { error: 'Informe um valor maior que zero.' };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+  if (!isValidDate(transactionDate)) {
     return { error: 'Informe uma data válida.' };
   }
   if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
@@ -44,7 +58,14 @@ function parseTransactionInput(
   }
 
   return {
-    input: { description, type, amountCents, transactionDate, categoryId },
+    input: {
+      description,
+      type,
+      amountCents,
+      transactionDate,
+      categoryId,
+      accountId,
+    },
   };
 }
 
@@ -91,9 +112,11 @@ export async function GET(request: Request) {
           .prepare(
             `SELECT t.id, t.description, t.type, t.amount_cents AS amountCents,
                   t.transaction_date AS transactionDate, c.id AS categoryId,
-                  c.name AS categoryName
+                  c.name AS categoryName, t.account_id AS accountId,
+                  COALESCE(a.name,'Conta principal') AS accountName
              FROM transactions t
              JOIN categories c ON c.id = t.category_id
+             LEFT JOIN financial_accounts a ON a.id = t.account_id AND a.owner_id = t.owner_id
             WHERE t.owner_id = ?
               AND t.transaction_date >= ? AND t.transaction_date < ?
             ORDER BY t.transaction_date DESC, t.id DESC`,
@@ -161,10 +184,21 @@ export async function POST(request: Request) {
     if ('error' in parsed) {
       return Response.json({ error: parsed.error }, { status: 400 });
     }
-    const { description, type, amountCents, transactionDate, categoryId } =
-      parsed.input;
+    const {
+      description,
+      type,
+      amountCents,
+      transactionDate,
+      categoryId,
+      accountId,
+    } = parsed.input;
 
     const db = getDb();
+    if (!(await accountIsValid(db, user.userId, accountId, transactionDate)))
+      return Response.json(
+        { error: 'Conta inválida ou data anterior ao saldo inicial.' },
+        { status: 400 },
+      );
     await seedCategories(db);
     const category = await categoryMatchesType(db, categoryId, type);
 
@@ -175,25 +209,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await db
-      .prepare(
-        `INSERT INTO transactions
+    const results = await db.batch([
+      ownerLock(db, user.userId),
+      db
+        .prepare(
+          `INSERT INTO transactions
           (description, type, amount_cents, transaction_date, category_id,
-           owner_id, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        description,
-        type,
-        amountCents,
-        transactionDate,
-        categoryId,
-        user.userId,
-        new Date().toISOString(),
-      )
-      .run();
+           owner_id, created_at, account_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        )
+        .bind(
+          description,
+          type,
+          amountCents,
+          transactionDate,
+          categoryId,
+          user.userId,
+          new Date().toISOString(),
+          accountId,
+        ),
+    ]);
 
-    return Response.json({ id: result.meta.last_row_id }, { status: 201 });
+    return Response.json({ id: results[1].meta.last_row_id }, { status: 201 });
   } catch (error) {
     console.error('Failed to create transaction', error);
     return Response.json(
@@ -226,10 +263,21 @@ export async function PATCH(request: Request) {
     if ('error' in parsed) {
       return Response.json({ error: parsed.error }, { status: 400 });
     }
-    const { description, type, amountCents, transactionDate, categoryId } =
-      parsed.input;
+    const {
+      description,
+      type,
+      amountCents,
+      transactionDate,
+      categoryId,
+      accountId,
+    } = parsed.input;
 
     const db = getDb();
+    if (!(await accountIsValid(db, user.userId, accountId, transactionDate)))
+      return Response.json(
+        { error: 'Conta inválida ou data anterior ao saldo inicial.' },
+        { status: 400 },
+      );
     await seedCategories(db);
     const category = await categoryMatchesType(db, categoryId, type);
     if (!category) {
@@ -239,25 +287,28 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const result = await db
-      .prepare(
-        `UPDATE transactions
+    const results = await db.batch([
+      ownerLock(db, user.userId),
+      db
+        .prepare(
+          `UPDATE transactions
             SET description = ?, type = ?, amount_cents = ?,
-                transaction_date = ?, category_id = ?
+                transaction_date = ?, category_id = ?, account_id = ?
           WHERE id = ? AND owner_id = ? AND type IN ('income', 'expense')`,
-      )
-      .bind(
-        description,
-        type,
-        amountCents,
-        transactionDate,
-        categoryId,
-        id,
-        user.userId,
-      )
-      .run();
+        )
+        .bind(
+          description,
+          type,
+          amountCents,
+          transactionDate,
+          categoryId,
+          accountId,
+          id,
+          user.userId,
+        ),
+    ]);
 
-    if (result.meta.changes === 0) {
+    if (results[1].meta.changes === 0) {
       return Response.json(
         { error: 'Transação não encontrada.' },
         { status: 404 },

@@ -2,6 +2,7 @@ import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb, type Database } from '@/db';
 import { seedCategories } from '@/lib/finance-categories';
 import { getMonthRange, todayInBrazil } from '@/lib/finance-month';
+import { accountStateSql } from '@/lib/accounts-server';
 import {
   addMonths,
   isValidDate,
@@ -96,8 +97,9 @@ export async function GET(request: Request) {
           )
           .all(),
         db
-          .prepare(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE -amount_cents END), 0) AS "balanceCents"
-          FROM transactions WHERE owner_id = ? AND transaction_date <= ?`)
+          .prepare(
+            `${accountStateSql} SELECT SUM(balance_cents) AS "balanceCents" FROM account_state`,
+          )
           .bind(user.userId, today)
           .first(),
         db

@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb } from '@/db';
+import { accountStateSql } from '@/lib/accounts-server';
 import { getMonthRange, todayInBrazil } from '@/lib/finance-month';
 import { addMonths, type RecurringRule } from '@/lib/recurring';
 import {
@@ -36,8 +37,9 @@ export async function GET() {
       confirmations,
     ] = await Promise.all([
       db
-        .prepare(`SELECT COALESCE(SUM(CASE WHEN type = 'income' THEN amount_cents ELSE -amount_cents END), 0) AS balance
-        FROM transactions WHERE owner_id = ? AND transaction_date <= ?`)
+        .prepare(
+          `${accountStateSql} SELECT SUM(balance_cents) AS balance, SUM(reserved_cents) AS reserved, SUM(available_cents) AS available FROM account_state`,
+        )
         .bind(user.userId, today)
         .first(),
       db
@@ -122,6 +124,8 @@ export async function GET() {
         month,
         updatedAt: new Date().toISOString(),
         accountBalanceCents: Number(account?.balance ?? 0),
+        reservedGoalCents: Number(account?.reserved ?? 0),
+        availableBalanceCents: Number(account?.available ?? 0),
         walletBalanceCents: Number(wallet?.balance ?? 0),
         portfolioValueCents: Number(portfolio?.balance ?? 0),
         monthly: {

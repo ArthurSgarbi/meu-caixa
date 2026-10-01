@@ -57,6 +57,9 @@ const assistantRoute = await import('../app/api/assistant/route.ts');
 const preferencesRoute = await import('../app/api/preferences/route.ts');
 const overviewRoute = await import('../app/api/overview/route.ts');
 const searchRoute = await import('../app/api/transactions/search/route.ts');
+const accountsRoute = await import('../app/api/accounts/route.ts');
+const goalsRoute = await import('../app/api/goals/route.ts');
+const { randomUUID } = await import('node:crypto');
 const { defaultPreferences } = await import('../lib/user-preferences.ts');
 const { todayInBrazil } = await import('../lib/finance-month.ts');
 
@@ -123,6 +126,7 @@ before(async () => {
     '0002_reclassificar_aportes.sql',
     '0003_tiresome_gamora.sql',
     '0004_configuracoes_usuario.sql',
+    '0005_oval_zaladane.sql',
   ]) {
     const migration = readFileSync(join(projectRoot, 'drizzle', file), 'utf8');
     for (const statement of migration.split('--> statement-breakpoint')) {
@@ -139,7 +143,7 @@ beforeEach(async () => {
   await pg.exec(`TRUNCATE TABLE budgets, categories, credit_card_invoices,
     credit_card_transactions, credit_cards, investment_contributions,
     investment_wallets, investments, saved_simulations, transactions,
-    recurring_rules, user_preferences RESTART IDENTITY CASCADE`);
+    recurring_rules, user_preferences, financial_accounts, financial_goals, account_transfers, goal_allocations RESTART IDENTITY CASCADE`);
 });
 
 test('handler returns 401 without authentication', async () => {
@@ -148,6 +152,16 @@ test('handler returns 401 without authentication', async () => {
     new Request('https://local.test/api/transactions?month=2026-09'),
   );
   assert.equal(response.status, 401);
+  assert.equal((await accountsRoute.GET()).status, 401);
+  assert.equal((await goalsRoute.GET()).status, 401);
+  assert.equal(
+    (await accountsRoute.POST(jsonRequest('/api/accounts', 'POST', {}))).status,
+    401,
+  );
+  assert.equal(
+    (await goalsRoute.POST(jsonRequest('/api/goals', 'POST', {}))).status,
+    401,
+  );
   assert.equal((await overviewRoute.GET()).status, 401);
   assert.equal(
     (
@@ -969,4 +983,412 @@ test('assistant sends only the authenticated user’s context to the AI provider
       delete process.env.CLOUDFLARE_WORKERS_AI_TOKEN;
     else process.env.CLOUDFLARE_WORKERS_AI_TOKEN = previousToken;
   }
+});
+
+async function createAccount(name = 'Inter', openingBalanceCents = 0) {
+  const response = await accountsRoute.POST(
+    jsonRequest('/api/accounts', 'POST', {
+      action: 'create',
+      name,
+      institution: name,
+      openingBalanceCents,
+      openedOn: todayInBrazil(),
+      requestId: randomUUID(),
+    }),
+  );
+  assert.equal(
+    response.status,
+    201,
+    JSON.stringify(await response.clone().json()),
+  );
+  return (await response.json()).id;
+}
+async function createGoal(targetCents = 500000) {
+  const response = await goalsRoute.POST(
+    jsonRequest('/api/goals', 'POST', {
+      action: 'create',
+      name: 'Viagem real',
+      targetCents,
+      targetDate: '2099-12-31',
+      requestId: randomUUID(),
+    }),
+  );
+  assert.equal(
+    response.status,
+    201,
+    JSON.stringify(await response.clone().json()),
+  );
+  return (await response.json()).id;
+}
+async function reserve(
+  goalId,
+  accountId,
+  amountCents,
+  action = 'reserve',
+  requestId = randomUUID(),
+) {
+  return goalsRoute.POST(
+    jsonRequest('/api/goals', 'POST', {
+      action,
+      goalId,
+      accountId,
+      amountCents,
+      requestId,
+    }),
+  );
+}
+async function transfer(
+  fromAccountId,
+  toAccountId,
+  amountCents,
+  requestId = randomUUID(),
+) {
+  return accountsRoute.POST(
+    jsonRequest('/api/accounts', 'POST', {
+      action: 'transfer',
+      fromAccountId,
+      toAccountId,
+      amountCents,
+      requestId,
+      description: 'Transferência real',
+    }),
+  );
+}
+test('internal transfers and goals preserve consolidated balance and monthly income/expense', async () => {
+  await createIncomeForA();
+  currentOwner = 'test-owner-a';
+  const inter = await createAccount('Inter', 100000),
+    nubank = await createAccount('Nubank'),
+    goal = await createGoal();
+  const initial = (await (await accountsRoute.GET()).json()).totals;
+  assert.deepEqual(initial, {
+    balanceCents: 600001,
+    reservedCents: 0,
+    availableCents: 600001,
+  });
+  assert.equal((await reserve(goal, inter, 50000)).status, 201);
+  assert.equal((await transfer(inter, nubank, 20000)).status, 201);
+  assert.equal((await transfer(null, nubank, 100000)).status, 201);
+  const data = await (await accountsRoute.GET()).json();
+  assert.deepEqual(data.totals, {
+    balanceCents: 600001,
+    reservedCents: 50000,
+    availableCents: 550001,
+  });
+  assert.equal(data.accounts.find((a) => a.id === inter).balanceCents, 80000);
+  assert.equal(data.accounts.find((a) => a.id === nubank).balanceCents, 120000);
+  assert.equal(data.goals[0].savedCents, 50000);
+  assert.equal(data.goals[0].remainingCents, 450000);
+  const summary = await (
+    await transactionsRoute.GET(
+      new Request('https://local.test/api/transactions?month=2026-09'),
+    )
+  ).json();
+  assert.equal(summary.summary.incomeCents, 500001);
+  assert.equal(summary.summary.expenseCents, 0);
+  assert.equal(summary.summary.transferCents, 0);
+  const overview = await (await overviewRoute.GET()).json();
+  assert.equal(overview.accountBalanceCents, 600001);
+  assert.equal(overview.reservedGoalCents, 50000);
+  assert.equal(overview.availableBalanceCents, 550001);
+  const forecast = await (
+    await recurringRoute.GET(
+      new Request('https://local.test/api/recurring?month=2026-09'),
+    )
+  ).json();
+  assert.equal(forecast.startingBalanceCents, 600001);
+});
+test('reservations block internal transfers and wallet contributions, and can be released partially', async () => {
+  currentOwner = 'test-owner-a';
+  const account = await createAccount('Inter', 100000),
+    other = await createAccount('Nubank'),
+    goal = await createGoal();
+  assert.equal((await reserve(goal, account, 90000)).status, 201);
+  assert.equal((await transfer(account, other, 10001)).status, 400);
+  assert.equal(
+    (
+      await walletRoute.POST(
+        jsonRequest('/api/investment-wallet', 'POST', {
+          amountCents: 10001,
+          accountId: account,
+          contributionDate: todayInBrazil(),
+          description: 'Aporte conta',
+        }),
+      )
+    ).status,
+    400,
+  );
+  assert.equal((await reserve(goal, account, 90001, 'release')).status, 400);
+  assert.equal((await reserve(goal, account, 20000, 'release')).status, 201);
+  assert.equal(
+    (
+      await walletRoute.POST(
+        jsonRequest('/api/investment-wallet', 'POST', {
+          amountCents: 10000,
+          accountId: account,
+          contributionDate: todayInBrazil(),
+          description: 'Aporte conta',
+        }),
+      )
+    ).status,
+    201,
+  );
+  const data = await (await accountsRoute.GET()).json();
+  assert.equal(data.goals[0].savedCents, 70000);
+  assert.equal(data.accounts.find((a) => a.id === account).balanceCents, 90000);
+  assert.equal(
+    data.accounts.find((a) => a.id === account).availableCents,
+    20000,
+  );
+});
+test('financial operations are idempotent and reject same request key with another payload', async () => {
+  currentOwner = 'test-owner-a';
+  const from = await createAccount('Inter', 100000),
+    to = await createAccount('Nubank'),
+    goal = await createGoal();
+  const key = randomUUID();
+  assert.equal((await transfer(from, to, 10000, key)).status, 201);
+  assert.equal((await transfer(from, to, 10000, key)).status, 200);
+  assert.equal((await transfer(from, to, 10001, key)).status, 409);
+  const reserveKey = randomUUID();
+  assert.equal(
+    (await reserve(goal, from, 10000, 'reserve', reserveKey)).status,
+    201,
+  );
+  assert.equal(
+    (await reserve(goal, from, 10000, 'reserve', reserveKey)).status,
+    200,
+  );
+  assert.equal(
+    (await reserve(goal, from, 10000, 'release', reserveKey)).status,
+    409,
+  );
+  const data = await (await accountsRoute.GET()).json();
+  assert.equal(data.transfers.length, 1);
+  assert.equal(data.goals[0].savedCents, 10000);
+});
+test('two simultaneous operations cannot allocate or transfer the same free balance', async () => {
+  currentOwner = 'test-owner-a';
+  const from = await createAccount('Inter', 100000),
+    to = await createAccount('Nubank'),
+    goal = await createGoal();
+  const outcomes = await Promise.all([
+    reserve(goal, from, 70000),
+    transfer(from, to, 70000),
+  ]);
+  assert.deepEqual(
+    outcomes.map((r) => r.status).sort((a, b) => a - b),
+    [201, 400],
+  );
+  const data = await (await accountsRoute.GET()).json();
+  assert.equal(data.totals.balanceCents, 100000);
+  assert.ok(data.accounts.every((a) => a.availableCents >= 0));
+});
+test('accounts and goals cannot be read, edited, funded or referenced across owners', async () => {
+  currentOwner = 'test-owner-a';
+  const account = await createAccount('Inter privado', 100000),
+    goal = await createGoal();
+  currentOwner = 'test-owner-b';
+  const other = await createAccount('Banco B', 100000);
+  const data = await (await accountsRoute.GET()).json();
+  assert.equal(
+    data.accounts.some((a) => a.id === account),
+    false,
+  );
+  assert.equal(data.goals.length, 0);
+  assert.equal((await transfer(other, account, 100)).status, 400);
+  assert.equal((await reserve(goal, other, 100)).status, 400);
+  assert.equal(
+    (
+      await accountsRoute.PATCH(
+        jsonRequest('/api/accounts', 'PATCH', {
+          id: account,
+          name: 'Invasão',
+          institution: 'Outro',
+        }),
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await goalsRoute.PATCH(
+        jsonRequest('/api/goals', 'PATCH', {
+          id: goal,
+          name: 'Invasão',
+          targetCents: 100,
+          targetDate: '2099-12-31',
+        }),
+      )
+    ).status,
+    400,
+  );
+  const categories = await categoryIds();
+  currentOwner = 'test-owner-b';
+  assert.equal(
+    (
+      await transactionsRoute.POST(
+        jsonRequest('/api/transactions', 'POST', {
+          description: 'Conta estrangeira',
+          type: 'income',
+          amountCents: 100,
+          transactionDate: todayInBrazil(),
+          categoryId: categories['Salário'],
+          accountId: account,
+        }),
+      )
+    ).status,
+    400,
+  );
+  await assert.rejects(
+    pg.query(
+      'INSERT INTO goal_allocations (owner_id,goal_id,account_id,amount_cents,request_id,created_at) VALUES ($1,$2,$3,100,$4,$5)',
+      ['test-owner-b', goal, other, randomUUID(), 'now'],
+    ),
+  );
+});
+test('account selection survives edits/search and reserves ignore future income', async () => {
+  currentOwner = 'test-owner-a';
+  const account = await createAccount('Inter', 10000),
+    goal = await createGoal();
+  const categories = await categoryIds();
+  const expense = await transactionsRoute.POST(
+    jsonRequest('/api/transactions', 'POST', {
+      description: 'Almoço Inter',
+      type: 'expense',
+      amountCents: 1000,
+      transactionDate: todayInBrazil(),
+      categoryId: categories['Alimentação'],
+      accountId: account,
+    }),
+  );
+  assert.equal(expense.status, 201);
+  const id = (await expense.json()).id;
+  assert.ok(id > 0);
+  assert.equal(
+    (
+      await transactionsRoute.PATCH(
+        jsonRequest('/api/transactions', 'PATCH', {
+          id,
+          description: 'Almoço editado',
+          type: 'expense',
+          amountCents: 1100,
+          transactionDate: todayInBrazil(),
+          categoryId: categories['Alimentação'],
+          accountId: account,
+        }),
+      )
+    ).status,
+    200,
+  );
+  const search = await searchRoute.GET(
+    new Request(
+      `https://local.test/api/transactions/search?accountId=${account}`,
+    ),
+  );
+  const result = await search.json();
+  assert.equal(result.total, 1);
+  assert.equal(result.transactions[0].accountId, account);
+  assert.equal(result.transactions[0].accountName, 'Inter');
+  const main = await searchRoute.GET(
+    new Request('https://local.test/api/transactions/search?accountId=main'),
+  );
+  assert.equal((await main.json()).total, 0);
+  assert.equal(
+    (
+      await transactionsRoute.POST(
+        jsonRequest('/api/transactions', 'POST', {
+          description: 'Receita futura',
+          type: 'income',
+          amountCents: 1000000,
+          transactionDate: '2099-01-01',
+          categoryId: categories['Salário'],
+          accountId: account,
+        }),
+      )
+    ).status,
+    201,
+  );
+  assert.equal((await reserve(goal, account, 8901)).status, 400);
+  assert.equal((await reserve(goal, account, 8900)).status, 201);
+  assert.equal(
+    (
+      await goalsRoute.PATCH(
+        jsonRequest('/api/goals', 'PATCH', {
+          id: goal,
+          name: 'Revisada',
+          targetCents: 8800,
+          targetDate: '2099-12-31',
+        }),
+      )
+    ).status,
+    400,
+  );
+});
+test('new accounts and goals round-trip through an isolated backup restore', async () => {
+  currentOwner = 'test-owner-a';
+  const from = await createAccount('Inter', 100000),
+    to = await createAccount('Nubank'),
+    goal = await createGoal();
+  await transfer(from, to, 20000);
+  await reserve(goal, to, 10000);
+  const before = await (await accountsRoute.GET()).json();
+  const backup = await (
+    await exportRoute.GET(
+      new Request('https://local.test/api/data-export?format=backup'),
+    )
+  ).json();
+  assert.equal(backup.data.account_transfers.length, 1);
+  assert.equal(backup.data.goal_allocations.length, 1);
+  await pg.exec(
+    'TRUNCATE financial_accounts,financial_goals,account_transfers,goal_allocations CASCADE',
+  );
+  const restored = await restoreRoute.POST(
+    jsonRequest('/api/data-restore?mode=restore', 'POST', backup),
+  );
+  assert.equal(
+    restored.status,
+    200,
+    JSON.stringify(await restored.clone().json()),
+  );
+  const after = await (await accountsRoute.GET()).json();
+  assert.deepEqual(after.totals, before.totals);
+  assert.deepEqual(after.goals, before.goals);
+});
+
+test('restore rejects an older reservation exceeding the current goal atomically', async () => {
+  currentOwner = 'test-owner-a';
+  const account = await createAccount('Inter', 100000),
+    goal = await createGoal();
+  assert.equal((await reserve(goal, account, 10000)).status, 201);
+  const backup = await (
+    await exportRoute.GET(
+      new Request('https://local.test/api/data-export?format=backup'),
+    )
+  ).json();
+  await pg.exec('DELETE FROM goal_allocations');
+  assert.equal(
+    (
+      await goalsRoute.PATCH(
+        jsonRequest('/api/goals', 'PATCH', {
+          id: goal,
+          name: 'Meta reduzida',
+          targetCents: 5000,
+          targetDate: '2099-12-31',
+        }),
+      )
+    ).status,
+    200,
+  );
+  const restored = await restoreRoute.POST(
+    jsonRequest('/api/data-restore?mode=restore', 'POST', backup),
+  );
+  assert.equal(restored.status, 400);
+  assert.equal(
+    Number(
+      (await pg.query('SELECT COUNT(*) AS count FROM goal_allocations')).rows[0]
+        .count,
+    ),
+    0,
+  );
 });

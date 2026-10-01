@@ -2,6 +2,8 @@
 export const landingAreas = [
   'overview',
   'expenses',
+  'accounts',
+  'goals',
   'investments',
   'credit-cards',
   'simulations',

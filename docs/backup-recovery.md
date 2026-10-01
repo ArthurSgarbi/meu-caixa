@@ -2,7 +2,9 @@
 
 ## Backup do usuário
 
-Na aba **Gastos → Seus dados e backup**, baixe o CSV para abrir as transações em planilhas ou o JSON para guardar uma cópia de todas as áreas financeiras da conta: transações, recorrências, orçamentos, carteira, aportes, ativos, simulações, cartões, faturas e compras.
+Em **Configurações → Seus dados e backup**, baixe o CSV para abrir as transações em planilhas ou o JSON para guardar uma cópia de todas as áreas financeiras da conta: transações, recorrências, orçamentos, carteira, aportes, ativos, simulações, cartões, faturas, compras, contas, metas, transferências internas e reservas.
+
+O CSV identifica a conta de cada transação; o histórico de transferências internas e reservas fica no JSON. Backups anteriores à inclusão de contas/metas continuam compatíveis: seus lançamentos permanecem na Conta principal. A restauração valida que reservas não sejam negativas nem ultrapassem o objetivo, inclusive ao combinar registros ausentes com metas atuais.
 
 O JSON inclui um SHA-256 para detectar corrupção acidental. Isso **não é uma assinatura digital**: quem altera o arquivo também pode recalcular o hash. Trate o arquivo como dado financeiro privado e guarde-o fora do repositório.
 

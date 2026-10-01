@@ -6,7 +6,107 @@ import {
   serial,
   text,
   uniqueIndex,
+  check,
+  foreignKey,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+
+export const financialAccounts = pgTable(
+  'financial_accounts',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    name: text('name').notNull(),
+    institution: text('institution').notNull(),
+    openingBalanceCents: integer('opening_balance_cents').notNull().default(0),
+    openedOn: text('opened_on').notNull(),
+    requestId: text('request_id').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('idx_accounts_owner_id').on(t.ownerId, t.id),
+    uniqueIndex('idx_accounts_request').on(t.ownerId, t.requestId),
+    check('accounts_opening_nonnegative', sql`${t.openingBalanceCents} >= 0`),
+  ],
+);
+
+export const financialGoals = pgTable(
+  'financial_goals',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    name: text('name').notNull(),
+    targetCents: integer('target_cents').notNull(),
+    targetDate: text('target_date').notNull(),
+    requestId: text('request_id').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('idx_goals_owner_id').on(t.ownerId, t.id),
+    uniqueIndex('idx_goals_request').on(t.ownerId, t.requestId),
+    check('goals_target_positive', sql`${t.targetCents} > 0`),
+  ],
+);
+
+export const accountTransfers = pgTable(
+  'account_transfers',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    fromAccountId: integer('from_account_id'),
+    toAccountId: integer('to_account_id'),
+    amountCents: integer('amount_cents').notNull(),
+    transferDate: text('transfer_date').notNull(),
+    description: text('description').notNull(),
+    requestId: text('request_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('idx_account_transfers_request').on(t.ownerId, t.requestId),
+    index('idx_account_transfers_owner_date').on(t.ownerId, t.transferDate),
+    foreignKey({
+      columns: [t.ownerId, t.fromAccountId],
+      foreignColumns: [financialAccounts.ownerId, financialAccounts.id],
+    }),
+    foreignKey({
+      columns: [t.ownerId, t.toAccountId],
+      foreignColumns: [financialAccounts.ownerId, financialAccounts.id],
+    }),
+    check(
+      'transfers_distinct_accounts',
+      sql`${t.fromAccountId} IS DISTINCT FROM ${t.toAccountId}`,
+    ),
+    check('account_transfers_positive', sql`${t.amountCents} > 0`),
+  ],
+);
+
+export const goalAllocations = pgTable(
+  'goal_allocations',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    goalId: integer('goal_id').notNull(),
+    accountId: integer('account_id'),
+    amountCents: integer('amount_cents').notNull(),
+    requestId: text('request_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('idx_goal_allocations_request').on(t.ownerId, t.requestId),
+    index('idx_goal_allocations_owner_goal').on(t.ownerId, t.goalId),
+    foreignKey({
+      columns: [t.ownerId, t.goalId],
+      foreignColumns: [financialGoals.ownerId, financialGoals.id],
+    }),
+    foreignKey({
+      columns: [t.ownerId, t.accountId],
+      foreignColumns: [financialAccounts.ownerId, financialAccounts.id],
+    }),
+    check('goal_allocations_nonzero', sql`${t.amountCents} <> 0`),
+  ],
+);
 
 export const categories = pgTable(
   'categories',
@@ -46,6 +146,7 @@ export const transactions = pgTable(
       .notNull()
       .references(() => categories.id),
     ownerId: text('owner_id').notNull().default(''),
+    accountId: integer('account_id'),
     recurringRuleId: integer('recurring_rule_id').references(
       () => recurringRules.id,
       {
@@ -56,6 +157,10 @@ export const transactions = pgTable(
     createdAt: text('created_at').notNull(),
   },
   (table) => [
+    foreignKey({
+      columns: [table.ownerId, table.accountId],
+      foreignColumns: [financialAccounts.ownerId, financialAccounts.id],
+    }),
     index('idx_transactions_owner_date').on(
       table.ownerId,
       table.transactionDate,

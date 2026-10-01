@@ -32,6 +32,11 @@ export async function GET(request: Request) {
   try {
     const where = ['t.owner_id = ?'];
     const values: (string | number)[] = [user.userId];
+    if (input.accountFilter === 'main') where.push('t.account_id IS NULL');
+    else if (typeof input.accountFilter === 'number') {
+      where.push('t.account_id = ?');
+      values.push(input.accountFilter);
+    }
     if (input.query) {
       // Sem extensão PostgreSQL adicional: busca pt-BR sem diferenças de acento.
       where.push(
@@ -64,7 +69,9 @@ export async function GET(request: Request) {
     const [rows, summary] = await Promise.all([
       db
         .prepare(`SELECT t.id, t.description, t.type, t.amount_cents AS "amountCents", t.transaction_date AS "transactionDate",
-        c.id AS "categoryId", c.name AS "categoryName" FROM transactions t JOIN categories c ON c.id = t.category_id
+        c.id AS "categoryId", c.name AS "categoryName", t.account_id AS "accountId", COALESCE(a.name,'Conta principal') AS "accountName"
+        FROM transactions t JOIN categories c ON c.id = t.category_id
+        LEFT JOIN financial_accounts a ON a.id = t.account_id AND a.owner_id = t.owner_id
         WHERE ${clause} ORDER BY ${sortSql[input.sort]} LIMIT ? OFFSET ?`)
         .bind(...values, searchPageSize, (input.page - 1) * searchPageSize)
         .all(),

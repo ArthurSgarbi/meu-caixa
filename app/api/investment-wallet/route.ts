@@ -1,10 +1,17 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb } from '@/db';
 import { calculateDailyYield } from '@/lib/investment-calculations';
+import {
+  accountStateSql,
+  accountIsValid,
+  ownerLock,
+} from '@/lib/accounts-server';
+import { parseAccountId } from '@/lib/accounts-goals';
+import { todayInBrazil } from '@/lib/finance-month';
+import { isValidDate } from '@/lib/recurring';
 
 export const dynamic = 'force-dynamic';
 
-const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const defaultAnnualCdiRate = 10.5;
 const defaultCdbPercentage = 100;
 
@@ -47,14 +54,9 @@ export async function GET() {
         .all(),
       db
         .prepare(
-          `SELECT COALESCE(
-              SUM(CASE WHEN type = 'income' THEN amount_cents
-                       ELSE -amount_cents END), 0
-            ) AS balanceCents
-             FROM transactions
-            WHERE owner_id = ?`,
+          `${accountStateSql} SELECT SUM(available_cents) AS "balanceCents" FROM account_state`,
         )
-        .bind(user.userId)
+        .bind(user.userId, todayInBrazil())
         .first(),
     ]);
 
@@ -103,19 +105,29 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
+    let accountId: number | null;
+    try {
+      accountId = parseAccountId(body.accountId);
+    } catch {
+      return Response.json({ error: 'Conta inválida.' }, { status: 400 });
+    }
     const amountCents = Number(body.amountCents);
     const contributionDate =
       typeof body.contributionDate === 'string' ? body.contributionDate : '';
     const description =
       typeof body.description === 'string' ? body.description.trim() : '';
 
-    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) {
+    if (
+      !Number.isSafeInteger(amountCents) ||
+      amountCents <= 0 ||
+      amountCents > 2_147_483_647
+    ) {
       return Response.json(
         { error: 'Informe um valor de aporte maior que zero.' },
         { status: 400 },
       );
     }
-    if (!datePattern.test(contributionDate)) {
+    if (!isValidDate(contributionDate) || contributionDate > todayInBrazil()) {
       return Response.json(
         { error: 'Informe uma data de aporte válida.' },
         { status: 400 },
@@ -129,6 +141,11 @@ export async function POST(request: Request) {
     }
 
     const db = getDb();
+    if (!(await accountIsValid(db, user.userId, accountId, contributionDate)))
+      return Response.json(
+        { error: 'Conta inválida para esta data.' },
+        { status: 400 },
+      );
     const now = new Date().toISOString();
     await db.batch([
       db
@@ -161,7 +178,8 @@ export async function POST(request: Request) {
     // O bloqueio da carteira serializa aportes da mesma pessoa. A consulta de
     // saldo acontece no comando seguinte, já dentro da MESMA transação: um
     // segundo aporte aguardará o primeiro e enxergará o débito recém-gravado.
-    const [walletLock, transfer] = await db.batch([
+    const [, walletLock, transfer] = await db.batch([
+      ownerLock(db, user.userId),
       db
         .prepare(
           `SELECT id FROM investment_wallets
@@ -170,17 +188,13 @@ export async function POST(request: Request) {
         .bind(user.userId),
       db
         .prepare(
-          `WITH available AS (
-             SELECT COALESCE(
-               SUM(CASE WHEN type = 'income' THEN amount_cents
-                        ELSE -amount_cents END), 0
-             ) AS balance_cents
-               FROM transactions WHERE owner_id = ?
+          `${accountStateSql}, available AS (
+             SELECT available_cents AS balance_cents FROM account_state WHERE id IS NOT DISTINCT FROM ?::integer
            ), transferred AS (
              INSERT INTO transactions
                (description, type, amount_cents, transaction_date,
-                category_id, owner_id, created_at)
-             SELECT ?, 'transfer', ?, ?, ?, ?, ?
+                category_id, owner_id, created_at, account_id)
+             SELECT ?, 'transfer', ?, ?, ?, ?, ?, ?
                FROM investment_wallets w CROSS JOIN available a
               WHERE w.owner_id = ? AND a.balance_cents >= ?
              RETURNING owner_id
@@ -202,12 +216,15 @@ export async function POST(request: Request) {
         )
         .bind(
           user.userId,
+          todayInBrazil(),
+          accountId,
           `Investimento: ${description}`,
           amountCents,
           contributionDate,
           Number(category.id),
           user.userId,
           now,
+          accountId,
           user.userId,
           amountCents,
           amountCents,
@@ -226,13 +243,9 @@ export async function POST(request: Request) {
 
     const mainBalanceResult = await db
       .prepare(
-        `SELECT COALESCE(
-            SUM(CASE WHEN type = 'income' THEN amount_cents
-                     ELSE -amount_cents END), 0
-          ) AS balanceCents
-           FROM transactions WHERE owner_id = ?`,
+        `${accountStateSql} SELECT available_cents AS "balanceCents" FROM account_state WHERE id IS NOT DISTINCT FROM ?::integer`,
       )
-      .bind(user.userId)
+      .bind(user.userId, todayInBrazil(), accountId)
       .first();
     const mainBalanceCents = Number(mainBalanceResult?.balanceCents ?? 0);
 

@@ -66,6 +66,7 @@ test('backup recusa data impossível mesmo com checksum recalculado', () => {
       description: 'Teste',
       type: 'expense',
       amount_cents: 100,
+      account_id: null,
       transaction_date: '2026-02-30',
       category_id: 1,
       recurring_rule_id: null,
@@ -91,4 +92,44 @@ test('backup recusa data impossível mesmo com checksum recalculado', () => {
 test('CSV neutraliza fórmulas de planilha e escapa aspas', () => {
   assert.equal(csvCell('=HYPERLINK("x")'), '"\'=HYPERLINK(""x"")"');
   assert.equal(csvCell('Mercado "A"'), '"Mercado ""A"""');
+});
+
+test('backup recusa reserva negativa mesmo com checksum recalculado', () => {
+  const data = Object.fromEntries(backupTables.map(({ name }) => [name, []]));
+  data.financial_goals = [
+    {
+      id: 1,
+      owner_id: 'usuario-1',
+      name: 'Meta',
+      target_cents: 10000,
+      target_date: '2027-01-01',
+      request_id: 'teste',
+      created_at: 'now',
+      updated_at: 'now',
+    },
+  ];
+  data.goal_allocations = [
+    {
+      id: 1,
+      owner_id: 'usuario-1',
+      goal_id: 1,
+      account_id: null,
+      amount_cents: -100,
+      request_id: 'teste',
+      created_at: 'now',
+    },
+  ];
+  const backup = {
+    format: 'meu-caixa-backup',
+    version: 1,
+    ownerId: 'usuario-1',
+    exportedAt: '2026-09-30T00:00:00Z',
+    categories: [],
+    data,
+  };
+  assert.throws(
+    () =>
+      validateBackup({ ...backup, sha256: backupDigest(backup) }, 'usuario-1'),
+    /Reservas/,
+  );
 });

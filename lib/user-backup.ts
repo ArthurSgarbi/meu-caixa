@@ -14,6 +14,9 @@ const nullableColumns = new Set([
   'ticker',
   'quantity',
   'paid_at',
+  'account_id',
+  'from_account_id',
+  'to_account_id',
 ]);
 const dateColumns = new Set([
   'starts_on',
@@ -25,6 +28,9 @@ const dateColumns = new Set([
   'closing_date',
   'due_date',
   'purchase_date',
+  'opened_on',
+  'target_date',
+  'transfer_date',
 ]);
 const integerColumns = new Set([
   'id',
@@ -46,9 +52,42 @@ const integerColumns = new Set([
   'invoice_id',
   'installment_number',
   'installment_count',
+  'account_id',
+  'from_account_id',
+  'to_account_id',
+  'goal_id',
+  'opening_balance_cents',
+  'target_cents',
 ]);
 
 export const backupTables = [
+  {
+    name: 'financial_accounts',
+    columns: [
+      'id',
+      'owner_id',
+      'name',
+      'institution',
+      'opening_balance_cents',
+      'opened_on',
+      'request_id',
+      'created_at',
+      'updated_at',
+    ],
+  },
+  {
+    name: 'financial_goals',
+    columns: [
+      'id',
+      'owner_id',
+      'name',
+      'target_cents',
+      'target_date',
+      'request_id',
+      'created_at',
+      'updated_at',
+    ],
+  },
   {
     name: 'recurring_rules',
     columns: [
@@ -74,6 +113,7 @@ export const backupTables = [
       'type',
       'amount_cents',
       'transaction_date',
+      'account_id',
       'category_id',
       'recurring_rule_id',
       'recurring_occurrence_date',
@@ -190,6 +230,32 @@ export const backupTables = [
       'created_at',
     ],
   },
+  {
+    name: 'account_transfers',
+    columns: [
+      'id',
+      'owner_id',
+      'from_account_id',
+      'to_account_id',
+      'amount_cents',
+      'transfer_date',
+      'description',
+      'request_id',
+      'created_at',
+    ],
+  },
+  {
+    name: 'goal_allocations',
+    columns: [
+      'id',
+      'owner_id',
+      'goal_id',
+      'account_id',
+      'amount_cents',
+      'request_id',
+      'created_at',
+    ],
+  },
 ] as const;
 
 export type BackupTableName = (typeof backupTables)[number]['name'];
@@ -232,6 +298,27 @@ export function validateBackup(value: unknown, ownerId: string): UserBackup {
     typeof backup.data !== 'object'
   )
     throw new Error('Dados do backup incompletos.');
+  // Verificar o checksum ANTES de acrescentar campos opcionais de arquivos antigos.
+  if (
+    typeof backup.sha256 !== 'string' ||
+    backup.sha256 !== backupDigest(backup as UserBackup)
+  )
+    throw new Error('O arquivo não passou na verificação de integridade.');
+  const extensionTables = [
+    'financial_accounts',
+    'financial_goals',
+    'account_transfers',
+    'goal_allocations',
+  ] as const;
+  const legacy = extensionTables.every((name) => !(name in backup.data!));
+  if (legacy) {
+    for (const name of extensionTables) backup.data[name] = [];
+    if (Array.isArray(backup.data.transactions))
+      backup.data.transactions = backup.data.transactions.map((row) => ({
+        ...row,
+        account_id: row.account_id ?? null,
+      }));
+  }
   if (
     backup.categories.length > 100 ||
     backup.categories.some(
@@ -305,11 +392,32 @@ export function validateBackup(value: unknown, ownerId: string): UserBackup {
       }
     }
   }
+  // Uma liberação não pode criar reserva negativa, mesmo com checksum recalculado.
+  const reservations = new Map<string, number>();
+  const goalTotals = new Map<number, number>();
+  for (const row of backup.data.goal_allocations) {
+    const goalId = Number(row.goal_id);
+    const key = `${goalId}:${row.account_id === null ? 'main' : Number(row.account_id)}`;
+    reservations.set(
+      key,
+      (reservations.get(key) ?? 0) + Number(row.amount_cents),
+    );
+    goalTotals.set(
+      goalId,
+      (goalTotals.get(goalId) ?? 0) + Number(row.amount_cents),
+    );
+  }
   if (
-    typeof backup.sha256 !== 'string' ||
-    backup.sha256 !== backupDigest(backup as UserBackup)
+    [...reservations.values()].some((amount) => amount < 0) ||
+    backup.data.financial_goals.some(
+      (row) =>
+        Number(row.target_cents) <= 0 ||
+        (goalTotals.get(Number(row.id)) ?? 0) > Number(row.target_cents),
+    )
   )
-    throw new Error('O arquivo não passou na verificação de integridade.');
+    throw new Error('Reservas ou objetivos inválidos no backup.');
+  // A cópia normalizada é válida também quando usada novamente na restauração.
+  backup.sha256 = backupDigest(backup as UserBackup);
   return backup as UserBackup;
 }
 

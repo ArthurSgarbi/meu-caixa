@@ -39,6 +39,8 @@ export type OverviewData = {
   month: string;
   updatedAt: string;
   accountBalanceCents: number;
+  reservedGoalCents?: number;
+  availableBalanceCents?: number;
   walletBalanceCents: number;
   portfolioValueCents: number;
   monthly: { incomeCents: number; expenseCents: number; transferCents: number };

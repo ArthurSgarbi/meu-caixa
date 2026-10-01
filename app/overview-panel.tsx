@@ -226,7 +226,7 @@ export function OverviewPanel({
             <OverviewMetric
               title="Saldo confirmado da conta"
               value={money(data.accountBalanceCents)}
-              detail="Receitas menos despesas e aportes até hoje."
+              detail="Saldo consolidado das contas, incluindo saldos iniciais."
               icon={<WalletCards aria-hidden="true" />}
             />
             <OverviewMetric
@@ -247,6 +247,29 @@ export function OverviewPanel({
               detail="Vencidas e a vencer nos próximos 30 dias, não marcadas como pagas."
               icon={<CreditCard aria-hidden="true" />}
             />
+          </div>
+          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border p-4 text-sm">
+            <span>
+              Reservado para metas: {money(data.reservedGoalCents ?? 0)}
+            </span>
+            <span>
+              Saldo livre:{' '}
+              {money(data.availableBalanceCents ?? data.accountBalanceCents)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate('goals')}
+            >
+              Ver metas
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onNavigate('accounts')}
+            >
+              Ver contas
+            </Button>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">
             Aportes e carteira são controles separados e podem representar o

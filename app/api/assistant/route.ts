@@ -1,11 +1,10 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb, type Database } from '@/db';
 import { calculateMonthlyAccountChangeCents } from '@/lib/finance-calculations';
-import {
-  currentMonthInBrazil,
-  getMonthRange,
-} from '@/lib/finance-month';
+import { currentMonthInBrazil, getMonthRange } from '@/lib/finance-month';
 import { ASSISTANT_SYSTEM_PROMPT } from '@/lib/assistant-system-prompt';
+import { loadAccountsGoals, accountStateSql } from '@/lib/accounts-server';
+import { todayInBrazil } from '@/lib/finance-month';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +75,7 @@ async function loadFinancialContext(db: Database, ownerId: string) {
     cardsResult,
     wallet,
     investments,
+    accountsGoals,
   ] = await Promise.all([
     db
       .prepare(
@@ -91,12 +91,9 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       .first(),
     db
       .prepare(
-        `SELECT COALESCE(
-           SUM(CASE WHEN type = 'income' THEN amount_cents ELSE -amount_cents END), 0
-         ) AS "balanceCents"
-         FROM transactions WHERE owner_id = ?`,
+        `${accountStateSql} SELECT SUM(balance_cents) AS "balanceCents" FROM account_state`,
       )
-      .bind(ownerId)
+      .bind(ownerId, todayInBrazil())
       .first(),
     db
       .prepare(
@@ -179,6 +176,7 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       )
       .bind(ownerId)
       .first(),
+    loadAccountsGoals(ownerId),
   ]);
 
   const incomeCents = Number(monthlySummary?.incomeCents ?? 0);
@@ -213,6 +211,10 @@ async function loadFinancialContext(db: Database, ownerId: string) {
       ),
     },
     mainAccountBalanceCents: Number(accountBalance?.balanceCents ?? 0),
+    financialAccounts: accountsGoals.accounts,
+    financialGoals: accountsGoals.goals,
+    reservedForGoalsCents: accountsGoals.totals.reservedCents,
+    freelyAvailableCents: accountsGoals.totals.availableCents,
     topExpenseCategories: topCategories.results,
     monthlyBudgets: budgetsResult.results.map((budget) => ({
       category: String(budget.category),

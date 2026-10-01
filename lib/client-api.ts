@@ -15,7 +15,7 @@ export async function apiFetch(url: string, options: RequestInit = {}) {
       ['POST', 'PUT', 'PATCH', 'DELETE'].includes(
         (options.method ?? 'GET').toUpperCase(),
       ) &&
-      /^\/api\/(transactions|budgets|credit-cards|investments|investment-wallet|recurring|data-restore)(\/|$)/.test(
+      /^\/api\/(accounts|goals|transactions|budgets|credit-cards|investments|investment-wallet|recurring|data-restore)(\/|$)/.test(
         url,
       )
     ) {

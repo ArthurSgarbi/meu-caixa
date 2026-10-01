@@ -1,5 +1,6 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb } from '@/db';
+import { ownerLock } from '@/lib/accounts-server';
 import {
   backupTables,
   validateBackup,
@@ -95,6 +96,34 @@ export async function POST(request: Request) {
     const ruleIds = new Set(
       backup.data.recurring_rules.map((row) => Number(row.id)),
     );
+    const accountIds = new Set(
+      backup.data.financial_accounts.map((r) => Number(r.id)),
+    );
+    const goalIds = new Set(
+      backup.data.financial_goals.map((r) => Number(r.id)),
+    );
+    const validAccount = (value: unknown) =>
+      value === null || accountIds.has(Number(value));
+    if (
+      backup.data.transactions.some((r) => !validAccount(r.account_id)) ||
+      backup.data.account_transfers.some(
+        (r) =>
+          !validAccount(r.from_account_id) ||
+          !validAccount(r.to_account_id) ||
+          r.from_account_id === r.to_account_id ||
+          Number(r.amount_cents) <= 0,
+      ) ||
+      backup.data.goal_allocations.some(
+        (r) =>
+          !validAccount(r.account_id) ||
+          !goalIds.has(Number(r.goal_id)) ||
+          Number(r.amount_cents) === 0,
+      )
+    )
+      return Response.json(
+        { error: 'O backup possui vínculos inválidos de contas ou metas.' },
+        { status: 400 },
+      );
     const walletIds = new Set(
       backup.data.investment_wallets.map((row) => Number(row.id)),
     );
@@ -183,7 +212,7 @@ export async function POST(request: Request) {
         { headers: { 'Cache-Control': 'no-store' } },
       );
     if (totalMissing) {
-      const statements = [];
+      const statements = [ownerLock(db, user.userId)];
       for (const table of backupTables) {
         const rows = missing[table.name];
         for (let offset = 0; offset < rows.length; offset += 50) {
@@ -211,6 +240,19 @@ export async function POST(request: Request) {
             ),
           );
       }
+      // Validar também a união do backup com registros atuais; metas existentes
+      // podem ter sido editadas desde a exportação. Uma falha desfaz o lote inteiro.
+      statements.push(
+        db
+          .prepare(`SELECT 1 / CASE WHEN
+        EXISTS (SELECT 1 FROM goal_allocations WHERE owner_id = ?
+          GROUP BY goal_id, account_id HAVING SUM(amount_cents) < 0)
+        OR EXISTS (SELECT 1 FROM financial_goals g
+          WHERE g.owner_id = ? AND (SELECT COALESCE(SUM(a.amount_cents),0)
+            FROM goal_allocations a WHERE a.owner_id = g.owner_id AND a.goal_id = g.id) > g.target_cents)
+        THEN 0 ELSE 1 END`)
+          .bind(user.userId, user.userId),
+      );
       // O lote inteiro é uma transação: erro de vínculo/índice desfaz todas as inserções.
       await db.batch(statements);
     }
@@ -219,6 +261,14 @@ export async function POST(request: Request) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
+    if (error instanceof Error && /division by zero/i.test(error.message))
+      return Response.json(
+        {
+          error:
+            'O backup conflita com as reservas ou objetivos atuais. Nenhum dado foi restaurado.',
+        },
+        { status: 400 },
+      );
     if (error instanceof SyntaxError)
       return Response.json({ error: 'JSON inválido.' }, { status: 400 });
     if (

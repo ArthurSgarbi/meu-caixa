@@ -585,13 +585,13 @@ export function InvestmentsPanel() {
 
           <div className="grid gap-3 md:grid-cols-3">
             <InvestmentSummary
-              label="Saldo da conta"
+              label="Saldo livre das contas"
               value={
                 walletLoadFailed
                   ? '—'
                   : formatCurrency(walletData.mainBalanceCents)
               }
-              detail="Disponível para investir"
+              detail="Consolidado, descontando reservas para metas"
               icon={<Landmark />}
               loading={walletLoading}
             />

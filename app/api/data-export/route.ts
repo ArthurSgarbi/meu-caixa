@@ -27,13 +27,14 @@ export async function GET(request: Request) {
     if (format === 'csv') {
       const rows = await db
         .prepare(`SELECT t.transaction_date AS "date", t.description, t.type,
-          t.amount_cents AS "amountCents", c.name AS category
+          t.amount_cents AS "amountCents", c.name AS category, COALESCE(a.name,'Conta principal') AS account
           FROM transactions t JOIN categories c ON c.id = t.category_id
+          LEFT JOIN financial_accounts a ON a.id = t.account_id AND a.owner_id = t.owner_id
           WHERE t.owner_id = ? ORDER BY t.transaction_date, t.id`)
         .bind(user.userId)
         .all();
       const lines = [
-        'Data;Descrição;Tipo;Categoria;Valor (R$)',
+        'Data;Descrição;Tipo;Categoria;Conta;Valor (R$)',
         ...rows.results.map((row) =>
           [
             csvCell(String(row.date)),
@@ -46,6 +47,7 @@ export async function GET(request: Request) {
                   : 'Despesa',
             ),
             csvCell(String(row.category)),
+            csvCell(String(row.account)),
             csvCell(
               (Number(row.amountCents) / 100).toFixed(2).replace('.', ','),
             ),

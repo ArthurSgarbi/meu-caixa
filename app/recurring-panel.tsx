@@ -6,6 +6,7 @@ import { useLatestRequest } from '@/hooks/use-latest-request';
 import {
   SyntheticEvent,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -28,6 +29,8 @@ import {
 } from '@/components/ui/native-select';
 import { parseBudgetLimitCents } from '@/lib/finance-calculations';
 import type { RecurringRule } from '@/lib/recurring';
+import { AccountSelect } from './account-select';
+import { AccountsContext } from '@/hooks/use-accounts-goals';
 
 type Category = { id: number; name: string; type: 'income' | 'expense' };
 type Occurrence = RecurringRule & { date: string; confirmed: boolean };
@@ -79,6 +82,14 @@ export function RecurringPanel({
   const [amount, setAmount] = useState('');
   const [startsOn, setStartsOn] = useState(() => `${month}-01`);
   const [endsOn, setEndsOn] = useState('');
+  const [confirmationAccount, setConfirmationAccount] = useState('main');
+  const accountsState = useContext(AccountsContext);
+  const selectedAccount = accountsState?.data?.accounts.find(
+    (account) =>
+      (account.id === null ? 'main' : String(account.id)) ===
+      confirmationAccount,
+  );
+  const accountReady = Boolean(selectedAccount && !accountsState?.error);
 
   const matchingCategories = useMemo(
     () => categories.filter((category) => category.type === type),
@@ -201,16 +212,22 @@ export function RecurringPanel({
   }
 
   async function confirm(occurrence: Occurrence) {
+    if (!accountReady) return;
     if (
       !window.confirm(
-        `Confirmar ${occurrence.description} de ${formatMoney(occurrence.amountCents)} em ${occurrence.date} como lançamento real?`,
+        `Confirmar ${occurrence.description} de ${formatMoney(occurrence.amountCents)} em ${occurrence.date} como lançamento real na conta ${selectedAccount?.name}?`,
       )
     )
       return;
     const saved = await mutate(
       'POST',
       '/api/recurring/confirm',
-      { ruleId: occurrence.id, date: occurrence.date },
+      {
+        ruleId: occurrence.id,
+        date: occurrence.date,
+        accountId:
+          confirmationAccount === 'main' ? null : Number(confirmationAccount),
+      },
       'Ocorrência confirmada e lançada no saldo real.',
     );
     if (saved) await onConfirmed();
@@ -222,6 +239,19 @@ export function RecurringPanel({
       aria-label="Recorrências e previsão de caixa"
     >
       <Card className="border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+        <div className="px-5 pt-5">
+          <AccountSelect
+            id="recurrence-account"
+            name="recurrenceAccount"
+            label="Conta para as próximas confirmações"
+            value={confirmationAccount}
+            onChange={setConfirmationAccount}
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Cada confirmação será lançada nesta conta. Você também pode alterar
+            a conta depois em Editar transação.
+          </p>
+        </div>
         <CardHeader className="border-b border-foreground/10 pb-4">
           <CardTitle className="flex items-center gap-2 text-lg font-bold">
             <CalendarClock className="size-5 text-primary" /> Recorrências e
@@ -372,7 +402,7 @@ export function RecurringPanel({
                         <Button
                           type="button"
                           size="sm"
-                          disabled={busy}
+                          disabled={busy || !accountReady}
                           onClick={() => void confirm(item)}
                         >
                           Confirmar lançamento

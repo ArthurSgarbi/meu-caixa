@@ -30,6 +30,7 @@ import { parseTransactionSearch } from '@/lib/transaction-search';
 import { useLatestRequest } from '@/hooks/use-latest-request';
 import { useMoneyFormatter } from './preferences-provider';
 import { formatDate } from './overview-panel';
+import { AccountSelect } from './account-select';
 
 type SearchTransaction = {
   id: number;
@@ -39,6 +40,8 @@ type SearchTransaction = {
   transactionDate: string;
   categoryId: number;
   categoryName: string;
+  accountId?: number | null;
+  accountName?: string;
 };
 type SearchResult = {
   transactions: SearchTransaction[];
@@ -135,7 +138,15 @@ export function TransactionSearchPanel({
       return typeof value === 'string' ? value : '';
     };
     setValidationError('');
-    for (const key of ['q', 'from', 'to', 'type', 'categoryId', 'sort'])
+    for (const key of [
+      'q',
+      'from',
+      'to',
+      'type',
+      'categoryId',
+      'accountId',
+      'sort',
+    ])
       params.set(key, formString(key));
     for (const key of ['minCents', 'maxCents']) {
       const input = formString(key).trim();
@@ -277,6 +288,7 @@ export function TransactionSearchPanel({
                 </NativeSelect>
               </div>
               <div className="flex flex-wrap items-end gap-2">
+                <AccountSelect id="search-account" name="accountId" allowAll />
                 <Button type="submit">
                   <Search />
                   Pesquisar
@@ -372,6 +384,8 @@ export function TransactionSearchPanel({
                             {transaction.type === 'transfer'
                               ? 'Transferência · Investimentos'
                               : transaction.categoryName}
+                            {' · '}
+                            {transaction.accountName ?? 'Conta principal'}
                           </p>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-right font-semibold tabular-nums">

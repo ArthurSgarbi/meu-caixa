@@ -2,6 +2,18 @@
 
 Aplicação web de controle financeiro pessoal com receitas e despesas, cartões de crédito, investimentos, simulações e uma assistente financeira com IA.
 
+## Contas e metas financeiras
+
+- Em **Contas**, cadastre contas manuais (instituição, nome e saldo inicial), acompanhe o saldo individual/consolidado e transfira valores entre elas. Transferências internas não são receitas, despesas nem aportes para investimentos.
+- Os registros anteriores continuam na **Conta principal**. Para separá-los por banco sem duplicar dinheiro, use uma transferência interna. Saldo inicial deve representar somente dinheiro ainda não contabilizado e não pode ser alterado pela edição da conta.
+- Em **Metas**, defina objetivo e prazo, reserve dinheiro de uma conta e libere a reserva quando necessário. O progresso depende exclusivamente dessas reservas registradas; o aporte mensal necessário não presume rendimento.
+- Reservas continuam na conta de origem. `Saldo livre = saldo confirmado - reservas`; valores reservados não podem ser transferidos ou aplicados sem antes serem liberados. Despesas manuais ainda podem tornar o saldo livre negativo, gerando um aviso para revisar lançamentos e reservas.
+- Em **Gastos**, selecione a conta ao registrar/editar transações, confirmar recorrências ou aportar no calculador CDI/CDB. A busca avançada também filtra por conta.
+
+As APIs de contas/metas usam exclusivamente o proprietário da sessão e as relações possuem chaves estrangeiras compostas por usuário. Transferências e reservas são atômicas, com trava por usuário e chave de idempotência para evitar duplicidade em reenvios. Nenhuma dessas funções conecta ou movimenta uma conta bancária real.
+
+A migração aditiva `0005_oval_zaladane.sql` deve ser aplicada antes desta versão. Contas, metas, transferências internas e reservas fazem parte do backup JSON; arquivos antigos continuam aceitos, com conta principal e novas tabelas vazias.
+
 Na área de Gastos, aportes são transferências da conta para a carteira: reduzem o saldo disponível, mas não são somados às despesas. Os orçamentos mensais por categoria comparam apenas despesas de consumo ao limite definido pelo usuário.
 
 Recorrências mensais aparecem como **previsões** e não alteram o saldo até a confirmação explícita de cada ocorrência. A projeção de seis meses combina o saldo confirmado de hoje, ocorrências pendentes e lançamentos futuros já registrados.

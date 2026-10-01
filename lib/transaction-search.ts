@@ -13,6 +13,7 @@ export type TransactionSearch = {
   to: string;
   type: '' | 'income' | 'expense' | 'transfer';
   categoryId: number | null;
+  accountFilter: '' | 'main' | number;
   minCents: number | null;
   maxCents: number | null;
   sort: (typeof searchSorts)[number];
@@ -52,11 +53,18 @@ export function parseTransactionSearch(
       : undefined;
   }
   const categoryId = integer('categoryId', 1);
+  const accountRaw = params.get('accountId') ?? '';
+  const accountFilter =
+    accountRaw === '' || accountRaw === 'main'
+      ? accountRaw
+      : integer('accountId', 1);
   const minCents = integer('minCents', 0);
   const maxCents = integer('maxCents', 0);
   const page = integer('page', 1) ?? (params.get('page') ? undefined : 1);
   if (
     categoryId === undefined ||
+    accountFilter === undefined ||
+    accountFilter === null ||
     minCents === undefined ||
     maxCents === undefined ||
     page === undefined ||
@@ -71,6 +79,7 @@ export function parseTransactionSearch(
     type: type as TransactionSearch['type'],
     sort: sort as TransactionSearch['sort'],
     categoryId,
+    accountFilter,
     minCents,
     maxCents,
     page,

@@ -195,6 +195,8 @@ export function SettingsPanel({
                   Visão Geral
                 </NativeSelectOption>
                 <NativeSelectOption value="expenses">Gastos</NativeSelectOption>
+                <NativeSelectOption value="accounts">Contas</NativeSelectOption>
+                <NativeSelectOption value="goals">Metas</NativeSelectOption>
                 <NativeSelectOption value="investments">
                   Investimentos
                 </NativeSelectOption>

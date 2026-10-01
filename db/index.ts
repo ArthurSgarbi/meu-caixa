@@ -110,7 +110,9 @@ export function getDb(): Database {
       return results.map((result) => ({
         meta: {
           changes: result.rowCount ?? 0,
-          last_row_id: null,
+          last_row_id:
+            Number((result.rows[0] as { id?: unknown } | undefined)?.id) ||
+            null,
         },
       }));
     },

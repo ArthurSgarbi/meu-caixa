@@ -36,6 +36,13 @@
       "when": 1790776163302,
       "tag": "0004_configuracoes_usuario",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790813586280,
+      "tag": "0005_oval_zaladane",
+      "breakpoints": true
     }
   ]
 }

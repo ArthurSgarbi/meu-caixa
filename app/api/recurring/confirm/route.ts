@@ -1,6 +1,8 @@
 import { getChatGPTUser } from '@/app/chatgpt-auth';
 import { getDb } from '@/db';
 import { isValidDate, occurrenceForMonth } from '@/lib/recurring';
+import { accountIsValid, ownerLock } from '@/lib/accounts-server';
+import { parseAccountId } from '@/lib/accounts-goals';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +24,17 @@ export async function POST(request: Request) {
     )
       return Response.json({ error: 'Ocorrência inválida.' }, { status: 400 });
     const db = getDb();
+    let accountId: number | null;
+    try {
+      accountId = parseAccountId((body as Record<string, unknown>).accountId);
+    } catch {
+      return Response.json({ error: 'Conta inválida.' }, { status: 400 });
+    }
+    if (!(await accountIsValid(db, user.userId, accountId, date)))
+      return Response.json(
+        { error: 'Conta inválida para esta data.' },
+        { status: 400 },
+      );
     const rule = await db
       .prepare(
         `SELECT id, starts_on AS "startsOn", ends_on AS "endsOn", active FROM recurring_rules WHERE id = ? AND owner_id = ?`,
@@ -45,15 +58,24 @@ export async function POST(request: Request) {
         { error: 'Esta previsão não está ativa.' },
         { status: 400 },
       );
-    const result = await db
-      .prepare(`INSERT INTO transactions
-        (description, type, amount_cents, transaction_date, category_id, owner_id, recurring_rule_id, recurring_occurrence_date, created_at)
-        SELECT description, type, amount_cents, ?, category_id, owner_id, id, ?, ?
+    const results = await db.batch([
+      ownerLock(db, user.userId),
+      db
+        .prepare(`INSERT INTO transactions
+        (description, type, amount_cents, transaction_date, category_id, owner_id, recurring_rule_id, recurring_occurrence_date, created_at, account_id)
+        SELECT description, type, amount_cents, ?, category_id, owner_id, id, ?, ?, ?
         FROM recurring_rules WHERE id = ? AND owner_id = ? AND active = 1
         ON CONFLICT (owner_id, recurring_rule_id, recurring_occurrence_date) DO NOTHING`)
-      .bind(date, date, new Date().toISOString(), ruleId, user.userId)
-      .run();
-    if (!result.meta.changes)
+        .bind(
+          date,
+          date,
+          new Date().toISOString(),
+          accountId,
+          ruleId,
+          user.userId,
+        ),
+    ]);
+    if (!results[1].meta.changes)
       return Response.json(
         { error: 'Esta ocorrência já foi confirmada.' },
         { status: 409 },
