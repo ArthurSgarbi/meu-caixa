@@ -59,6 +59,9 @@ const overviewRoute = await import('../app/api/overview/route.ts');
 const searchRoute = await import('../app/api/transactions/search/route.ts');
 const accountsRoute = await import('../app/api/accounts/route.ts');
 const goalsRoute = await import('../app/api/goals/route.ts');
+const bankConnectionsRoute =
+  await import('../app/api/bank-connections/route.ts');
+const { personalPluggyConfig } = await import('../lib/pluggy-client.ts');
 const { randomUUID } = await import('node:crypto');
 const { defaultPreferences } = await import('../lib/user-preferences.ts');
 const { todayInBrazil } = await import('../lib/finance-month.ts');
@@ -118,6 +121,155 @@ function inMemoryAdapter(pg) {
 }
 
 let pg;
+const bankEnv = {
+  PLUGGY_CLIENT_ID: '33333333-3333-4333-8333-333333333333',
+  PLUGGY_CLIENT_SECRET: 'server-test-secret',
+  PLUGGY_OWNER_ID: 'bank_owner',
+  PLUGGY_ITEM_IDS: '11111111-1111-4111-8111-111111111111',
+};
+const bankAccountId = '22222222-2222-4222-8222-222222222222';
+test('bank route enforces personal owner even when caller supplies another item or owner', async () => {
+  const originals = Object.fromEntries(
+    Object.keys(bankEnv).map((key) => [key, process.env[key]]),
+  );
+  Object.assign(process.env, bankEnv);
+  const calls = [];
+  const network = mock.method(globalThis, 'fetch', async (url) => {
+    calls.push(url);
+    throw new Error('Network must not be called for another tenant');
+  });
+  try {
+    currentOwner = 'other_owner';
+    const response = await bankConnectionsRoute.GET(
+      new Request(
+        'https://local.test/api/bank-connections?ownerId=bank_owner&itemId=foreign',
+      ),
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { enabled: false });
+    assert.deepEqual(calls, []);
+    assert.equal(
+      (await pg.query('SELECT * FROM bank_connection_snapshots')).rows.length,
+      0,
+    );
+  } finally {
+    network.mock.restore();
+    for (const [key, value] of Object.entries(originals))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  }
+});
+
+test('bank route persists sanitized snapshot and reloads privately without duplicating the ledger', async () => {
+  const originals = Object.fromEntries(
+    Object.keys(bankEnv).map((key) => [key, process.env[key]]),
+  );
+  Object.assign(process.env, bankEnv);
+  currentOwner = 'bank_owner';
+  const calls = [];
+  const network = mock.method(globalThis, 'fetch', async (url, options) => {
+    const path = new URL(url).pathname;
+    calls.push(path);
+    const payloads = {
+      '/auth': { apiKey: 'server-test-api-key' },
+      [`/items/${bankEnv.PLUGGY_ITEM_IDS}`]: {
+        id: bankEnv.PLUGGY_ITEM_IDS,
+        connector: { id: 200 },
+        status: 'UPDATED',
+        lastUpdatedAt: new Date().toISOString(),
+        products: ['ACCOUNTS', 'TRANSACTIONS'],
+      },
+      '/accounts': {
+        totalPages: 1,
+        results: [
+          {
+            id: bankAccountId,
+            itemId: bankEnv.PLUGGY_ITEM_IDS,
+            name: 'Banco fixture',
+            type: 'BANK',
+            currencyCode: 'BRL',
+            balance: 432.1,
+            number: 'private-number',
+            taxNumber: 'private-cpf',
+          },
+        ],
+      },
+      '/v2/transactions': {
+        results: [
+          {
+            id: 'fixture-movement',
+            accountId: bankAccountId,
+            description: 'Teste',
+            amount: -1.25,
+            status: 'POSTED',
+            type: 'DEBIT',
+            currencyCode: 'BRL',
+            date: new Date().toISOString(),
+          },
+        ],
+        next: null,
+      },
+    };
+    assert.equal(options.method, path === '/auth' ? 'POST' : 'GET');
+    assert.ok(path in payloads);
+    return Response.json(payloads[path]);
+  });
+  try {
+    const response = await bankConnectionsRoute.GET();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    const body = await response.json();
+    assert.equal(body.snapshot.connections[0].accounts[0].balanceCents, 43210);
+    const rows = (await pg.query('SELECT * FROM bank_connection_snapshots'))
+      .rows;
+    assert.equal(rows.length, 1);
+    for (const forbidden of [
+      'server-test-secret',
+      'server-test-api-key',
+      'private-number',
+      'private-cpf',
+    ]) {
+      assert.ok(!JSON.stringify(rows).includes(forbidden));
+      assert.ok(!JSON.stringify(body).includes(forbidden));
+    }
+    calls.length = 0;
+    assert.deepEqual(await (await bankConnectionsRoute.GET()).json(), body);
+    assert.deepEqual(calls, []);
+    assert.equal((await pg.query('SELECT * FROM transactions')).rows.length, 0);
+    assert.equal(
+      (await pg.query('SELECT * FROM financial_accounts')).rows.length,
+      0,
+    );
+    currentOwner = 'other_owner';
+    assert.deepEqual(await (await bankConnectionsRoute.GET()).json(), {
+      enabled: false,
+    });
+    assert.deepEqual(calls, []);
+
+    // Invalida configuração: nenhum snapshot antigo pode ser exibido na rotação.
+    currentOwner = 'bank_owner';
+    process.env.PLUGGY_CLIENT_SECRET = 'rotated-test-secret';
+    network.mock.mockImplementation(
+      async () => new Response('private-provider-error', { status: 403 }),
+    );
+    const failed = await bankConnectionsRoute.GET();
+    assert.equal(failed.status, 502);
+    assert.ok(!(await failed.text()).includes('private-provider-error'));
+    assert.equal(
+      (await pg.query('SELECT * FROM bank_connection_snapshots')).rows.length,
+      1,
+    );
+    assert.notEqual(
+      rows[0].scope_hash,
+      personalPluggyConfig(currentOwner).scope,
+    );
+  } finally {
+    network.mock.restore();
+    for (const [key, value] of Object.entries(originals))
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+  }
+});
 before(async () => {
   pg = new PGlite();
   for (const file of [
@@ -127,6 +279,7 @@ before(async () => {
     '0003_tiresome_gamora.sql',
     '0004_configuracoes_usuario.sql',
     '0005_oval_zaladane.sql',
+    '0006_organic_dorian_gray.sql',
   ]) {
     const migration = readFileSync(join(projectRoot, 'drizzle', file), 'utf8');
     for (const statement of migration.split('--> statement-breakpoint')) {
@@ -143,7 +296,7 @@ beforeEach(async () => {
   await pg.exec(`TRUNCATE TABLE budgets, categories, credit_card_invoices,
     credit_card_transactions, credit_cards, investment_contributions,
     investment_wallets, investments, saved_simulations, transactions,
-    recurring_rules, user_preferences, financial_accounts, financial_goals, account_transfers, goal_allocations RESTART IDENTITY CASCADE`);
+    recurring_rules, user_preferences, financial_accounts, financial_goals, account_transfers, goal_allocations, bank_connection_snapshots RESTART IDENTITY CASCADE`);
 });
 
 test('handler returns 401 without authentication', async () => {
@@ -154,6 +307,7 @@ test('handler returns 401 without authentication', async () => {
   assert.equal(response.status, 401);
   assert.equal((await accountsRoute.GET()).status, 401);
   assert.equal((await goalsRoute.GET()).status, 401);
+  assert.equal((await bankConnectionsRoute.GET()).status, 401);
   assert.equal(
     (await accountsRoute.POST(jsonRequest('/api/accounts', 'POST', {}))).status,
     401,

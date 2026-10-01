@@ -73,6 +73,7 @@ import { OverviewPanel, AlertsDialog } from './overview-panel';
 import { TransactionSearchPanel } from './transaction-search-panel';
 import { AccountsContext, useAccountsGoals } from '@/hooks/use-accounts-goals';
 import { AccountsGoalsPanel } from './accounts-goals-panel';
+import { BankConnectionsPanel } from './bank-connections-panel';
 import { AccountSelect, formAccountId } from './account-select';
 import { AssistantPanel } from './assistant-panel';
 import { BudgetsPanel } from './budgets-panel';
@@ -1518,6 +1519,7 @@ export default function Home() {
           </TabsContent>
 
           <TabsContent value="accounts">
+            <BankConnectionsPanel />
             <AccountsGoalsPanel mode="accounts" />
           </TabsContent>
           <TabsContent value="goals">

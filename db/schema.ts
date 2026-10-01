@@ -11,6 +11,19 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
+// Dados externos revogáveis: não participam de saldos manuais, reservas ou backups.
+export const bankConnectionSnapshots = pgTable(
+  'bank_connection_snapshots',
+  {
+    id: serial('id').primaryKey(),
+    ownerId: text('owner_id').notNull(),
+    scopeHash: text('scope_hash').notNull(),
+    payload: text('payload').notNull(),
+    fetchedAt: text('fetched_at').notNull(),
+  },
+  (t) => [uniqueIndex('idx_bank_snapshot_owner').on(t.ownerId)],
+);
+
 export const financialAccounts = pgTable(
   'financial_accounts',
   {
