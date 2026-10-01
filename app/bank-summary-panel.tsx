@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { summarizeBanks } from '@/lib/bank-summary';
 import { useBankConnectionsState } from '@/hooks/use-bank-connections';
 import { useMoneyFormatter } from './preferences-provider';
+import { BankScopeTabs } from './bank-scope-tabs';
+import { bankDisplayName } from '@/lib/bank-views';
 
 function timestamp(value: string | null) {
   return value
@@ -14,7 +16,8 @@ function timestamp(value: string | null) {
 }
 
 export function BankSummaryPanel({ onAccounts }: { onAccounts: () => void }) {
-  const { data, loading, error, reload } = useBankConnectionsState();
+  const { data, loading, error, reload, bankId, connections } =
+    useBankConnectionsState();
   const money = useMoneyFormatter();
   if (data && !data.enabled) return null;
   const snapshot = data?.enabled ? data.snapshot : null;
@@ -29,7 +32,9 @@ export function BankSummaryPanel({ onAccounts }: { onAccounts: () => void }) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Landmark className="size-5" aria-hidden="true" />
-              Saldo total nos bancos
+              {bankId === 'all'
+                ? 'Saldo total nos bancos'
+                : `Saldo no ${bankDisplayName(connections.find((c) => c.id === bankId)?.name ?? 'banco selecionado')}`}
             </CardTitle>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={onAccounts}>
@@ -56,6 +61,7 @@ export function BankSummaryPanel({ onAccounts }: { onAccounts: () => void }) {
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          {snapshot && <BankScopeTabs />}
           <p
             className="break-words text-3xl font-bold tabular-nums"
             aria-live="polite"

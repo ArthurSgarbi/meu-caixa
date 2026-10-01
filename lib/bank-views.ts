@@ -5,6 +5,24 @@ import type {
   BankSnapshot,
 } from './bank-connections.ts';
 
+/** Filtro somente visual: não altera a cópia original nem amplia autorizações. */
+export function bankScopeSnapshot(
+  snapshot: BankSnapshot,
+  bankId = 'all',
+): BankSnapshot {
+  if (bankId === 'all') return snapshot;
+  return {
+    ...snapshot,
+    connections: snapshot.connections.filter(
+      (connection) => connection.id === bankId,
+    ),
+  };
+}
+
+export function bankDisplayName(name: string): string {
+  return name.trim().toUpperCase() === 'BANCO INTER' ? 'Inter' : name;
+}
+
 export function authorizedConnections(
   snapshot: BankSnapshot,
   now = Date.now(),

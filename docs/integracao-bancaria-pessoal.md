@@ -32,6 +32,8 @@ Receitas, despesas, reservas e projeções do livro-caixa continuam explicitamen
 
 ## Integração nas abas
 
+O resumo principal oferece as abas **Todos os bancos** (padrão), **Inter** e **Mercado Pago**, conforme as conexões disponíveis. O filtro é compartilhado com Contas, Gastos, Investimentos, Cartões, Visão Geral e o botão de saldo em Simulações. A seleção não dispara outra consulta nem modifica os dados originais. Em Contas, a visão padrão reúne os detalhes de todas as conexões; escolher uma aba restringe a consulta visual a esse banco. O total considera somente saldos bancários válidos, sem somar limites de cartão ou posições sobrepostas. Banco removido, indisponível ou com consentimento expirado nunca vira automaticamente a seleção de todos, nem expõe dados antigos. A seleção pertence à sessão do usuário e não inclui dados bancários no armazenamento do navegador.
+
 Para o titular com integração habilitada, **Visão Geral**, **Gastos**, **Investimentos** e **Cartões** abrem no modo **Dados dos bancos**. O seletor de origem é compartilhado; **Registros manuais** preserva as ferramentas anteriores, sem somar ou importar dados para o livro-caixa. Usuários sem integração continuam com o fluxo manual. Erros bancários nunca ativam silenciosamente a visualização manual como substituta.
 
 - Gastos: extrato por mês civil e conta, com entradas/saídas dos registros consolidados carregados. O padrão exclui cartões, que podem ser selecionados separadamente. Datas ausentes e tipos/status desconhecidos não entram nos totais. Lista de até 100 registros por conta e janela de 90 dias: não é um relatório mensal completo, nem classificação automática de renda/despesa.

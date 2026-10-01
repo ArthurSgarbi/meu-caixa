@@ -9,12 +9,14 @@ import {
 } from 'react';
 import type { BankResponse } from '@/lib/bank-connections';
 import { BANK_REFRESH_MS } from '@/lib/bank-summary';
+import { bankScopeSnapshot } from '@/lib/bank-views';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from './use-latest-request';
 
 /** Uma consulta compartilhada por todas as áreas, sem gravar dados bancários no navegador. */
 export function useBankConnections(identity: string | null) {
   const [source, setSource] = useState<'bank' | 'manual'>('bank');
+  const [selection, setSelection] = useState({ identity, id: 'all' });
   const enabled = Boolean(identity);
   const [result, setResult] = useState<{
     identity: string | null;
@@ -69,8 +71,17 @@ export function useBankConnections(identity: string | null) {
     };
   }, [enabled, reload]);
   // Não expor um resultado anterior depois de sair da sessão.
+  const original =
+    enabled && result?.identity === identity ? result.data : null;
+  const bankId = selection.identity === identity ? selection.id : 'all';
+  const setBankId = (id: string) => setSelection({ identity, id });
   return {
-    data: enabled && result?.identity === identity ? result.data : null,
+    data: original?.enabled
+      ? { ...original, snapshot: bankScopeSnapshot(original.snapshot, bankId) }
+      : original,
+    connections: original?.enabled ? original.snapshot.connections : [],
+    bankId,
+    setBankId,
     loading: enabled && loading,
     error: enabled ? error : '',
     reload,

@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   authorizedConnections,
+  bankScopeSnapshot,
+  bankDisplayName,
   bankHasUnavailableData,
   bankAccounts,
   bankPositions,
@@ -10,6 +12,7 @@ import {
   bankOverviewTotals,
   movementSampleTotals,
 } from '../lib/bank-views.ts';
+import { summarizeBanks } from '../lib/bank-summary.ts';
 
 const account = (id, extra = {}) => ({
   id,
@@ -205,4 +208,82 @@ test('movimentos iguais em contas diferentes são eventos separados, não dedup 
     }),
   );
   assert.equal(bankMovements(s, '2026-10').length, 2);
+});
+
+test('abas reúnem os bancos por padrão e filtram todos os dados sem alterar a origem', () => {
+  const s = snapshot(
+    connection('inter', {
+      name: 'BANCO INTER',
+      accounts: [
+        account('inter-account', {
+          balanceCents: 1001,
+          movements: [movement('inter-tx')],
+        }),
+      ],
+    }),
+    connection('mp', {
+      name: 'Mercado Pago',
+      accounts: [
+        account('mp-account', {
+          balanceCents: 2002,
+          movements: [movement('mp-tx')],
+        }),
+      ],
+    }),
+  );
+  const before = structuredClone(s);
+  assert.equal(bankScopeSnapshot(s), s);
+  assert.equal(summarizeBanks(bankScopeSnapshot(s)).balanceCents, 3003);
+  for (const [id, balance, tx] of [
+    ['inter', 1001, 'inter-tx'],
+    ['mp', 2002, 'mp-tx'],
+  ]) {
+    const scoped = bankScopeSnapshot(s, id);
+    assert.equal(summarizeBanks(scoped).balanceCents, balance);
+    assert.deepEqual(
+      bankAccounts(scoped).map((a) => a.id),
+      [`${id === 'mp' ? 'mp' : 'inter'}-account`],
+    );
+    assert.deepEqual(
+      bankMovements(scoped, '2026-10').map((m) => m.id),
+      [tx],
+    );
+    assert.deepEqual(
+      bankPositions(scoped).map((p) => p.id),
+      [`${id}-position`],
+    );
+    assert.equal(scoped.checkedAt, s.checkedAt);
+  }
+  assert.deepEqual(s, before);
+  assert.equal(bankDisplayName('BANCO INTER'), 'Inter');
+  assert.equal(bankDisplayName('Mercado Pago'), 'Mercado Pago');
+});
+
+test('banco desconhecido, removido ou expirado não amplia o filtro nem expõe dados antigos', () => {
+  const s = snapshot(
+    connection('good'),
+    connection('expired', { consentExpiresAt: '2000-01-01' }),
+  );
+  for (const id of ['unknown', 'expired']) {
+    const scoped = bankScopeSnapshot(s, id);
+    assert.equal(summarizeBanks(scoped).balanceCents, null);
+    assert.equal(bankAccounts(scoped).length, 0);
+    assert.equal(bankPositions(scoped).length, 0);
+    assert.equal(bankMovements(scoped, '2026-10').length, 0);
+    assert.equal(bankOverviewTotals(scoped).investmentsCents, null);
+  }
+});
+
+test('um banco indisponível bloqueia o consolidado, mas não o saldo do banco válido selecionado', () => {
+  const s = snapshot(
+    connection('good'),
+    connection('bad', { status: 'REAUTHORIZATION_REQUIRED' }),
+  );
+  assert.equal(summarizeBanks(s).balanceCents, null);
+  assert.equal(summarizeBanks(bankScopeSnapshot(s, 'good')).balanceCents, 1000);
+  assert.equal(
+    bankOverviewTotals(bankScopeSnapshot(s, 'good')).investmentsCents,
+    2000,
+  );
+  assert.equal(summarizeBanks(bankScopeSnapshot(s, 'bad')).balanceCents, null);
 });
