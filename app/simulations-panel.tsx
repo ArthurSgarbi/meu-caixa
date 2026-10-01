@@ -3,8 +3,6 @@ import { useMoneyFormatter, usePreferences } from './preferences-provider';
 import { parseCurrencyToCents, parseDecimal } from '@/lib/frontend-input';
 import { apiFetch, readApiJson } from '@/lib/client-api';
 import { useLatestRequest } from '@/hooks/use-latest-request';
-import { useBankConnectionsState } from '@/hooks/use-bank-connections';
-import { summarizeBanks } from '@/lib/bank-summary';
 
 import {
   type ReactNode,
@@ -79,11 +77,6 @@ function numberFrom(value: unknown, fallback = 0) {
 }
 
 export function SimulationsPanel() {
-  const banks = useBankConnectionsState();
-  const bankBalance =
-    banks.data?.enabled && !banks.loading && !banks.error
-      ? summarizeBanks(banks.data.snapshot).balanceCents
-      : null;
   const formatCurrency = useMoneyFormatter();
   const [debtPrincipal, setDebtPrincipal] = useState('2.500,00');
   const [debtRate, setDebtRate] = useState('14,00');
@@ -399,25 +392,6 @@ export function SimulationsPanel() {
                 onChange={setInitialValue}
                 prefix="R$"
               />
-              {banks.data?.enabled && (
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    disabled={bankBalance === null || bankBalance < 0}
-                    onClick={() => {
-                      if (bankBalance !== null && bankBalance >= 0)
-                        setInitialValue(formatCurrencyInput(bankBalance));
-                    }}
-                  >
-                    Usar saldo dos bancos
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Preenche o valor inicial com o último saldo bancário
-                    recebido. Não transfere dinheiro nem altera seus cenários
-                    salvos.
-                  </p>
-                </div>
-              )}
               <Field
                 id="monthly-contribution"
                 label="Aporte mensal"
