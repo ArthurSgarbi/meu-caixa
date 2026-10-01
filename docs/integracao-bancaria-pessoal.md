@@ -20,7 +20,15 @@
 
 ## Atualização e retenção
 
-O painel consulta ao abrir a área Contas, ao retornar à aba e a cada 15 minutos enquanto visível. O servidor mantém cache por 15 minutos; a frequência real de sincronização bancária depende do MeuPluggy. Não é saldo em tempo real.
+O site consulta automaticamente após entrar, em qualquer área, ao retornar à aba, ao reconectar a internet e a cada 15 minutos enquanto visível. Uma consulta compartilhada alimenta o resumo e os detalhes em Contas, evitando timers duplicados. O servidor mantém cache por 15 minutos. O MeuPluggy gratuito sincroniza as conexões originais a cada 24 horas e reflete as atualizações nos proxies; estes não permitem atualização forçada. Não é saldo em tempo real. Com o site fechado, o MeuPluggy continua sua sincronização e a próxima abertura consulta a cópia disponível; não há cron ou novo plano contratado.
+
+## Saldo automático principal
+
+O card **Saldo total nos bancos** fica em destaque em todas as áreas. Soma somente contas de tipo `BANK`, moeda `BRL`, saldo válido em centavos e conexão autorizada. Cartões, limites de crédito, posições de investimentos e controles manuais ficam separados. Investimentos podem sobrepor saldos de contas e não são somados sem conciliação. Transferências internas não alteram o total dos saldos informados; nenhum cálculo de saldo usa o extrato limitado de 100 registros.
+
+IDs de contas repetidos não contam duas vezes. Dados divergentes, conexão indisponível, moeda estrangeira, saldo ausente ou lista parcial impedem exibir um subtotal como total. O painel mostra os valores individuais disponíveis e o motivo da indisponibilidade. Datas de consulta e atualização de cada banco são distintas; dados de mais de 48 horas ou sem data recebem aviso. Não há zeros fictícios, nem fallback silencioso para contas manuais. A preferência de ocultar valores vale também para o resumo.
+
+Receitas, despesas, reservas e projeções do livro-caixa continuam explicitamente manuais: um Pix recebido pode ser transferência própria ou empréstimo, e um extrato parcial não permite afirmar totais mensais exatos. A automação bancária não cria duplicatas nos lançamentos existentes.
 
 Após o cache expirar, o servidor verifica os itens. Se `lastUpdatedAt` não mudou, reaproveita movimentações, conforme a recomendação da API; se mudou, busca nova cópia de consulta. A API de transações usada é `/v2/transactions`.
 
@@ -31,5 +39,6 @@ Para desligar, remover as variáveis Pluggy da Vercel e republicar. Revogar tamb
 ## Referências oficiais
 
 - [Guia da API pessoal](https://meu.pluggy.ai/api-guide)
+- [Atualização diária do MeuPluggy e limitações dos proxies](https://docs.pluggy.ai/pt/docs/connections/item)
 - [Autenticação](https://docs.pluggy.ai/en/reference/auth/auth-create)
 - [Transações por cursor](https://docs.pluggy.ai/en/reference/transaction/transactions-list-by-cursor)

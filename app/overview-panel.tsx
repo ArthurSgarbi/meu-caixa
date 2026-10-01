@@ -214,7 +214,7 @@ export function OverviewPanel({
       {data && !loading && !error ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Conta e despesas até {formatDate(data.today)} · Atualizado às{' '}
+            Controle manual até {formatDate(data.today)} · Atualizado às{' '}
             {new Intl.DateTimeFormat('pt-BR', {
               hour: '2-digit',
               minute: '2-digit',
@@ -224,9 +224,9 @@ export function OverviewPanel({
           </p>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <OverviewMetric
-              title="Saldo confirmado da conta"
+              title="Saldo das contas manuais"
               value={money(data.accountBalanceCents)}
-              detail="Saldo consolidado das contas, incluindo saldos iniciais."
+              detail="Controle manual, incluindo saldos iniciais. Não integra o saldo bancário automático acima."
               icon={<WalletCards aria-hidden="true" />}
             />
             <OverviewMetric
@@ -253,7 +253,7 @@ export function OverviewPanel({
               Reservado para metas: {money(data.reservedGoalCents ?? 0)}
             </span>
             <span>
-              Saldo livre:{' '}
+              Saldo livre no controle manual:{' '}
               {money(data.availableBalanceCents ?? data.accountBalanceCents)}
             </span>
             <Button
@@ -303,7 +303,7 @@ export function OverviewPanel({
           </div>
           <Card>
             <CardHeader>
-              <CardTitle>Este mês até hoje</CardTitle>
+              <CardTitle>Registros manuais deste mês</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-3">
               <div>

@@ -187,7 +187,7 @@ export function AccountsGoalsPanel({ mode }: { mode: 'accounts' | 'goals' }) {
               <Target aria-hidden="true" />
             )}
             {mode === 'accounts'
-              ? 'Contas e instituições'
+              ? 'Contas manuais e instituições'
               : 'Metas financeiras'}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -241,7 +241,7 @@ export function AccountsGoalsPanel({ mode }: { mode: 'accounts' | 'goals' }) {
         <>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
-              ['Saldo consolidado', data.totals.balanceCents],
+              ['Saldo consolidado manual', data.totals.balanceCents],
               ['Reservado para metas', data.totals.reservedCents],
               ['Saldo livre', data.totals.availableCents],
             ].map(([name, amount]) => (

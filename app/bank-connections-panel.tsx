@@ -1,9 +1,7 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Landmark, RefreshCw, ShieldCheck } from 'lucide-react';
-import type { BankResponse } from '@/lib/bank-connections';
-import { apiFetch, readApiJson } from '@/lib/client-api';
-import { useLatestRequest } from '@/hooks/use-latest-request';
+import { useBankConnectionsState } from '@/hooks/use-bank-connections';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -23,58 +21,10 @@ function date(value: string | null, calendarDay = false) {
 }
 
 export function BankConnectionsPanel() {
-  const [data, setData] = useState<BankResponse | null>(null);
+  const { data, loading, error, reload } = useBankConnectionsState();
   const [selected, setSelected] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const start = useLatestRequest();
   const money = useMoneyFormatter();
   const { preferences } = usePreferences();
-  const reload = useCallback(async () => {
-    const request = start();
-    setLoading(true);
-    setError('');
-    try {
-      const response = await apiFetch('/api/bank-connections', {
-        signal: request.signal,
-      });
-      const result = (await readApiJson(response)) as BankResponse & {
-        error?: string;
-      };
-      if (!response.ok)
-        throw new Error(
-          result.error ?? 'Não foi possível consultar os bancos.',
-        );
-      if (request.isCurrent()) setData(result);
-    } catch (failure) {
-      if (request.isCurrent()) {
-        setData(null); // Em erro, nunca continuar mostrando dados antigos como atuais.
-        setError(
-          failure instanceof Error
-            ? failure.message
-            : 'Não foi possível consultar os bancos.',
-        );
-      }
-    } finally {
-      if (request.isCurrent()) setLoading(false);
-    }
-  }, [start]);
-  useEffect(() => {
-    // Adia a consulta inicial; o hook cancela a requisição quando a área desmonta.
-    const initial = window.setTimeout(() => void reload(), 0);
-    const timer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void reload();
-    }, 15 * 60_000);
-    const visible = () => {
-      if (document.visibilityState === 'visible') void reload();
-    };
-    document.addEventListener('visibilitychange', visible);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', visible);
-    };
-  }, [reload]);
   const snapshot = data?.enabled ? data.snapshot : null;
   const connection =
     snapshot?.connections.find((c) => c.id === selected) ??

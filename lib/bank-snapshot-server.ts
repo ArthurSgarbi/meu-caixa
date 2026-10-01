@@ -1,8 +1,9 @@
 import type { Database } from '../db/index.ts';
 import type { BankSnapshot } from './bank-connections.ts';
 import { createPluggyClient, type PluggyConfig } from './pluggy-client.ts';
+import { BANK_REFRESH_MS } from './bank-summary.ts';
 
-const ttl = 15 * 60_000;
+const ttl = BANK_REFRESH_MS;
 const client = createPluggyClient();
 const pending = new Map<string, Promise<BankSnapshot>>();
 
