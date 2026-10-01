@@ -30,6 +30,18 @@ IDs de contas repetidos não contam duas vezes. Dados divergentes, conexão indi
 
 Receitas, despesas, reservas e projeções do livro-caixa continuam explicitamente manuais: um Pix recebido pode ser transferência própria ou empréstimo, e um extrato parcial não permite afirmar totais mensais exatos. A automação bancária não cria duplicatas nos lançamentos existentes.
 
+## Integração nas abas
+
+Para o titular com integração habilitada, **Visão Geral**, **Gastos**, **Investimentos** e **Cartões** abrem no modo **Dados dos bancos**. O seletor de origem é compartilhado; **Registros manuais** preserva as ferramentas anteriores, sem somar ou importar dados para o livro-caixa. Usuários sem integração continuam com o fluxo manual. Erros bancários nunca ativam silenciosamente a visualização manual como substituta.
+
+- Gastos: extrato por mês civil e conta, com entradas/saídas dos registros consolidados carregados. O padrão exclui cartões, que podem ser selecionados separadamente. Datas ausentes e tipos/status desconhecidos não entram nos totais. Lista de até 100 registros por conta e janela de 90 dias: não é um relatório mensal completo, nem classificação automática de renda/despesa.
+- Investimentos: posições informadas, status e saldo, com soma disponível das posições ativas em BRL. Não cria ativos na carteira manual nem inventa cotação, quantidade, CDI ou rendimento diário. Consulta parcial ou banco indisponível impede apresentar um total confiável.
+- Cartões: seleção dos cartões recebidos, limite total/disponível, saldo e vencimento informado. O filtro mensal é de movimentações, não de faturas oficiais. Fechamento, parcelas futuras e histórico de faturas não são inferidos do extrato.
+- Visão Geral: atalhos e resumos dos cartões/posições com a mesma fonte compartilhada da área Contas. O saldo de contas segue destacado no resumo principal, separado de dívidas e investimentos.
+- Simulações: botão **Usar saldo dos bancos** preenche o valor inicial após ação do usuário, somente quando o total está disponível e não negativo. Não sobrescreve automaticamente cenários nem movimenta dinheiro.
+
+Metas, reservas, orçamentos e análises da IA continuam vinculados ao livro-caixa manual. Compartilhar os extratos bancários com um provedor de IA exige um escopo específico e não faz parte desta integração de telas. Dados bancários não são enviados automaticamente ao provedor de IA.
+
 Após o cache expirar, o servidor verifica os itens. Se `lastUpdatedAt` não mudou, reaproveita movimentações, conforme a recomendação da API; se mudou, busca nova cópia de consulta. A API de transações usada é `/v2/transactions`.
 
 Uma tabela guarda **a última cópia** por titular, sem acumular histórico de snapshots; não contém segredos e não participa dos backups manuais. Alterar credenciais/itens invalida o cache por hash. Erros de consulta ocultam os valores na interface, sem substituí-los por zeros. Autorizações revogadas/expiradas são ocultadas na próxima verificação (revogação pode levar até 15 minutos para ser detectada no cache).

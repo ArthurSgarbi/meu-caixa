@@ -14,6 +14,7 @@ import { useLatestRequest } from './use-latest-request';
 
 /** Uma consulta compartilhada por todas as áreas, sem gravar dados bancários no navegador. */
 export function useBankConnections(identity: string | null) {
+  const [source, setSource] = useState<'bank' | 'manual'>('bank');
   const enabled = Boolean(identity);
   const [result, setResult] = useState<{
     identity: string | null;
@@ -73,6 +74,8 @@ export function useBankConnections(identity: string | null) {
     loading: enabled && loading,
     error: enabled ? error : '',
     reload,
+    source,
+    setSource,
   };
 }
 

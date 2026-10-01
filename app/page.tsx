@@ -76,6 +76,13 @@ import { AccountsGoalsPanel } from './accounts-goals-panel';
 import { BankConnectionsPanel } from './bank-connections-panel';
 import { BankSummaryPanel } from './bank-summary-panel';
 import {
+  BankArea,
+  BankActivityPanel,
+  BankInvestmentsPanel,
+  BankCardsPanel,
+  BankDashboardPanel,
+} from './bank-area-panels';
+import {
   BankConnectionsContext,
   useBankConnections,
 } from '@/hooks/use-bank-connections';
@@ -860,654 +867,521 @@ export default function Home() {
               loading={overview.loading}
               error={overview.error}
               onReload={() => void overview.reload()}
-              onNavigate={navigateFromOverview}
+              onNavigate={(area) => {
+                banksState.setSource('manual');
+                navigateFromOverview(area);
+              }}
             />
             <BankSummaryPanel onAccounts={() => setActiveArea('accounts')} />
             <TabsContent value="overview">
-              <OverviewPanel
-                data={overview.data}
-                alerts={alerts}
-                loading={overview.loading}
-                error={overview.error}
-                onReload={() => void overview.reload()}
-                onNavigate={navigateFromOverview}
-                onAlerts={() => setAlertsOpen(true)}
-              />
+              <BankArea
+                bankContent={
+                  <BankDashboardPanel onNavigate={navigateFromOverview} />
+                }
+              >
+                <OverviewPanel
+                  data={overview.data}
+                  alerts={alerts}
+                  loading={overview.loading}
+                  error={overview.error}
+                  onReload={() => void overview.reload()}
+                  onNavigate={(area) => {
+                    banksState.setSource('manual');
+                    navigateFromOverview(area);
+                  }}
+                  onAlerts={() => setAlertsOpen(true)}
+                />
+              </BankArea>
             </TabsContent>
             <TabsContent value="expenses" keepMounted className="pb-16">
-              <header className="border-b border-foreground/15 text-foreground">
-                <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
-                  <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                      <p className="mb-1 text-sm font-medium text-foreground">
-                        Visão mensal
-                      </p>
-                      <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
-                        {monthLabel}
-                      </h1>
+              <BankArea
+                bankContent={
+                  <BankActivityPanel month={month} onMonth={setMonth} />
+                }
+              >
+                <header className="border-b border-foreground/15 text-foreground">
+                  <div className="mx-auto max-w-7xl px-5 pb-12 pt-9 sm:px-8 lg:px-10">
+                    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                      <div>
+                        <p className="mb-1 text-sm font-medium text-foreground">
+                          Visão mensal
+                        </p>
+                        <h1 className="capitalize text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
+                          {monthLabel}
+                        </h1>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          aria-label="Ver orçamentos do mês"
+                          title="Ver orçamentos do mês"
+                          onClick={() =>
+                            document
+                              .getElementById('monthly-budgets')
+                              ?.scrollIntoView({ behavior: 'smooth' })
+                          }
+                          className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
+                        >
+                          <Target />
+                          <span className="hidden md:inline">Orçamentos</span>
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void openInvestmentTransfer()}
+                          className="mr-1 bg-inverse font-semibold text-inverse-foreground hover:bg-inverse/85"
+                        >
+                          <PiggyBank />
+                          <span className="hidden sm:inline">
+                            Novo investimento
+                          </span>
+                          <span className="sm:hidden">Investir</span>
+                        </Button>
+                        <Button
+                          aria-label="Mês anterior"
+                          disabled={
+                            saving || editSaving || investmentTransferSaving
+                          }
+                          size="icon"
+                          onClick={() => changeMonth(-1)}
+                          className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
+                        >
+                          <ChevronLeft />
+                        </Button>
+                        <Button
+                          aria-label="Próximo mês"
+                          disabled={
+                            saving || editSaving || investmentTransferSaving
+                          }
+                          size="icon"
+                          onClick={() => changeMonth(1)}
+                          className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
+                        >
+                          <ChevronRight />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        aria-label="Ver orçamentos do mês"
-                        title="Ver orçamentos do mês"
-                        onClick={() =>
-                          document
-                            .getElementById('monthly-budgets')
-                            ?.scrollIntoView({ behavior: 'smooth' })
+
+                    <section
+                      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                      aria-label="Resumo mensal"
+                    >
+                      <SummaryCard
+                        label="Receitas"
+                        value={
+                          loadError
+                            ? '—'
+                            : formatCurrency(data.summary.incomeCents)
                         }
-                        className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
-                      >
-                        <Target />
-                        <span className="hidden md:inline">Orçamentos</span>
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => void openInvestmentTransfer()}
-                        className="mr-1 bg-inverse font-semibold text-inverse-foreground hover:bg-inverse/85"
-                      >
-                        <PiggyBank />
-                        <span className="hidden sm:inline">
-                          Novo investimento
-                        </span>
-                        <span className="sm:hidden">Investir</span>
-                      </Button>
-                      <Button
-                        aria-label="Mês anterior"
-                        disabled={
-                          saving || editSaving || investmentTransferSaving
+                        icon={<ArrowUpRight />}
+                        tone="positive"
+                        loading={loading}
+                      />
+                      <SummaryCard
+                        label="Despesas"
+                        value={
+                          loadError
+                            ? '—'
+                            : formatCurrency(data.summary.expenseCents)
                         }
-                        size="icon"
-                        onClick={() => changeMonth(-1)}
-                        className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
-                      >
-                        <ChevronLeft />
-                      </Button>
-                      <Button
-                        aria-label="Próximo mês"
-                        disabled={
-                          saving || editSaving || investmentTransferSaving
+                        icon={<ArrowDownLeft />}
+                        tone="negative"
+                        loading={loading}
+                      />
+                      <SummaryCard
+                        label="Transferido para investimentos"
+                        value={
+                          loadError
+                            ? '—'
+                            : formatCurrency(data.summary.transferCents)
                         }
-                        size="icon"
-                        onClick={() => changeMonth(1)}
-                        className="border border-foreground/15 bg-card/80 text-foreground hover:bg-secondary"
-                      >
-                        <ChevronRight />
-                      </Button>
-                    </div>
+                        icon={<PiggyBank />}
+                        tone="balance"
+                        loading={loading}
+                      />
+                      <SummaryCard
+                        label="Saldo do mês após aportes"
+                        value={
+                          loadError
+                            ? '—'
+                            : formatCurrency(data.summary.balanceCents)
+                        }
+                        icon={<WalletCards />}
+                        tone="balance"
+                        loading={loading}
+                      />
+                    </section>
                   </div>
+                </header>
 
-                  <section
-                    className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-                    aria-label="Resumo mensal"
-                  >
-                    <SummaryCard
-                      label="Receitas"
-                      value={
-                        loadError
-                          ? '—'
-                          : formatCurrency(data.summary.incomeCents)
-                      }
-                      icon={<ArrowUpRight />}
-                      tone="positive"
-                      loading={loading}
-                    />
-                    <SummaryCard
-                      label="Despesas"
-                      value={
-                        loadError
-                          ? '—'
-                          : formatCurrency(data.summary.expenseCents)
-                      }
-                      icon={<ArrowDownLeft />}
-                      tone="negative"
-                      loading={loading}
-                    />
-                    <SummaryCard
-                      label="Transferido para investimentos"
-                      value={
-                        loadError
-                          ? '—'
-                          : formatCurrency(data.summary.transferCents)
-                      }
-                      icon={<PiggyBank />}
-                      tone="balance"
-                      loading={loading}
-                    />
-                    <SummaryCard
-                      label="Saldo do mês após aportes"
-                      value={
-                        loadError
-                          ? '—'
-                          : formatCurrency(data.summary.balanceCents)
-                      }
-                      icon={<WalletCards />}
-                      tone="balance"
-                      loading={loading}
-                    />
-                  </section>
+                <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
+                  <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
+                    <CardHeader className="border-b border-foreground/10 pb-4">
+                      <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
+                        <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                          <Plus className="size-4" />
+                        </span>
+                        Nova transação
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <form className="space-y-5" onSubmit={handleSubmit}>
+                        <AccountSelect
+                          id="transaction-account"
+                          name="transactionAccount"
+                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="description">Descrição</Label>
+                          <Input
+                            id="description"
+                            name="description"
+                            required
+                            minLength={2}
+                            maxLength={120}
+                            placeholder="Ex.: supermercado"
+                            className="h-11"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="type">Tipo</Label>
+                            <NativeSelect
+                              id="type"
+                              value={type}
+                              onChange={(event) => {
+                                setType(event.target.value as TransactionType);
+                                setCategoryId('');
+                              }}
+                              className="w-full"
+                            >
+                              <NativeSelectOption value="expense">
+                                Despesa
+                              </NativeSelectOption>
+                              <NativeSelectOption value="income">
+                                Receita
+                              </NativeSelectOption>
+                            </NativeSelect>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="amount">Valor</Label>
+                            <Input
+                              id="amount"
+                              name="amount"
+                              required
+                              inputMode="decimal"
+                              placeholder="R$ 0,00"
+                              className="h-11"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="category">Categoria</Label>
+                            <NativeSelect
+                              id="category"
+                              required
+                              value={selectedCategoryId}
+                              onChange={(event) =>
+                                setCategoryId(event.target.value)
+                              }
+                              className="w-full"
+                              disabled={!availableCategories.length}
+                            >
+                              {availableCategories.map((category) => (
+                                <NativeSelectOption
+                                  key={category.id}
+                                  value={String(category.id)}
+                                >
+                                  {category.name}
+                                </NativeSelectOption>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="transactionDate">Data</Label>
+                            <Input
+                              id="transactionDate"
+                              name="transactionDate"
+                              required
+                              type="date"
+                              defaultValue={todayInBrazil()}
+                              className="h-11"
+                            />
+                          </div>
+                        </div>
+
+                        {(message || error) && (
+                          <output
+                            aria-live="polite"
+                            className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-destructive/10 text-destructive' : 'bg-inverse/10 text-foreground'}`}
+                          >
+                            {error && (
+                              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                            )}
+                            {error || message}
+                          </output>
+                        )}
+
+                        <Button
+                          type="submit"
+                          size="lg"
+                          disabled={saving || loading || !selectedCategoryId}
+                          className="h-11 w-full font-semibold"
+                        >
+                          {saving ? (
+                            <LoaderCircle className="animate-spin" />
+                          ) : (
+                            <Plus />
+                          )}
+                          {saving ? 'Registrando...' : 'Registrar transação'}
+                        </Button>
+                      </form>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
+                    <CardHeader className="flex-row items-center justify-between border-b border-foreground/10 pb-4">
+                      <div>
+                        <CardTitle className="text-lg font-bold tracking-tight">
+                          Movimentações
+                        </CardTitle>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {loading
+                            ? 'Carregando o mês...'
+                            : searchActive
+                              ? 'Busca no histórico completo com os filtros abaixo'
+                              : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
+                        </p>
+                      </div>
+                      <CalendarDays
+                        className="size-5 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </CardHeader>
+                    <CardContent className="px-0">
+                      <TransactionSearchPanel
+                        month={month}
+                        categories={data.categories}
+                        active={searchActive}
+                        onActiveChange={setSearchActive}
+                        refreshKey={budgetRefreshKey}
+                        onEdit={openTransactionEditor}
+                      />
+                      {!searchActive && (
+                        <>
+                          {loading ? (
+                            <div className="grid min-h-60 place-items-center text-muted-foreground">
+                              <LoaderCircle
+                                className="size-7 animate-spin"
+                                aria-label="Carregando transações"
+                              />
+                            </div>
+                          ) : loadError ? (
+                            <div className="grid min-h-60 place-items-center px-6 text-center">
+                              <div>
+                                <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
+                                <p className="font-medium">
+                                  Não foi possível abrir suas movimentações
+                                </p>
+                                <Button
+                                  variant="outline"
+                                  className="mt-4"
+                                  onClick={() => void loadData(month)}
+                                >
+                                  Tentar novamente
+                                </Button>
+                              </div>
+                            </div>
+                          ) : data.transactions.length === 0 ? (
+                            <div className="grid min-h-60 place-items-center px-6 text-center">
+                              <div>
+                                <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-inverse/10 text-foreground">
+                                  <ReceiptText />
+                                </span>
+                                <p className="font-semibold">
+                                  Nenhuma movimentação neste mês
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                  Use o formulário para registrar sua primeira
+                                  transação.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="pl-5">Data</TableHead>
+                                  <TableHead>Descrição</TableHead>
+                                  <TableHead>Categoria</TableHead>
+                                  <TableHead className="pr-5 text-right">
+                                    Valor
+                                  </TableHead>
+                                  <TableHead className="w-12 pr-5">
+                                    <span className="sr-only">Ações</span>
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {data.transactions.map((transaction) => (
+                                  <TableRow key={transaction.id}>
+                                    <TableCell className="pl-5 text-muted-foreground">
+                                      {dateFormatter.format(
+                                        new Date(
+                                          `${transaction.transactionDate}T00:00:00Z`,
+                                        ),
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                      {transaction.description}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="secondary">
+                                        {transaction.type === 'transfer'
+                                          ? 'Transferência · Investimentos'
+                                          : transaction.categoryName}
+                                        {' · '}
+                                        {transaction.accountName ??
+                                          'Conta principal'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold text-foreground tabular-nums">
+                                      {transaction.type === 'income'
+                                        ? '+ '
+                                        : '− '}
+                                      {formatCurrency(transaction.amountCents)}
+                                    </TableCell>
+                                    <TableCell className="pr-5 text-right">
+                                      {transaction.type !== 'transfer' && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          aria-label={`Editar ${transaction.description}`}
+                                          onClick={() =>
+                                            openTransactionEditor(transaction)
+                                          }
+                                        >
+                                          <Pencil />
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
-              </header>
 
-              <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
-                <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
-                  <CardHeader className="border-b border-foreground/10 pb-4">
-                    <CardTitle className="flex items-center gap-2 text-lg font-bold tracking-tight">
-                      <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                        <Plus className="size-4" />
-                      </span>
-                      Nova transação
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <form className="space-y-5" onSubmit={handleSubmit}>
+                <BudgetsPanel
+                  key={month}
+                  month={month}
+                  refreshKey={budgetRefreshKey}
+                />
+
+                <RecurringPanel
+                  key={`recurring-${month}`}
+                  month={month}
+                  categories={data.categories}
+                  refreshKey={budgetRefreshKey}
+                  onConfirmed={async () => {
+                    await loadData(month);
+                  }}
+                />
+
+                <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+                  <Button
+                    variant="outline"
+                    onClick={() => setActiveArea('settings')}
+                  >
+                    <Settings /> Configurações e backup dos dados
+                  </Button>
+                </div>
+
+                <Dialog
+                  open={investmentTransferOpen}
+                  onOpenChange={(open) => {
+                    if (!investmentTransferSaving)
+                      setInvestmentTransferOpen(open);
+                  }}
+                >
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Novo investimento</DialogTitle>
+                      <DialogDescription>
+                        O valor será descontado do saldo da conta e creditado no
+                        saldo de investimentos.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form
+                      className="space-y-4"
+                      onSubmit={handleInvestmentTransfer}
+                    >
                       <AccountSelect
-                        id="transaction-account"
-                        name="transactionAccount"
+                        id="investment-account"
+                        name="investmentAccount"
+                        label="Conta de origem"
+                        showBalance
                       />
                       <div className="space-y-2">
-                        <Label htmlFor="description">Descrição</Label>
+                        <Label htmlFor="investment-transfer-description">
+                          Descrição
+                        </Label>
                         <Input
-                          id="description"
-                          name="description"
+                          id="investment-transfer-description"
+                          name="investmentDescription"
                           required
                           minLength={2}
-                          maxLength={120}
-                          placeholder="Ex.: supermercado"
+                          maxLength={80}
+                          defaultValue="Aplicação CDI/CDB"
                           className="h-11"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="type">Tipo</Label>
-                          <NativeSelect
-                            id="type"
-                            value={type}
-                            onChange={(event) => {
-                              setType(event.target.value as TransactionType);
-                              setCategoryId('');
-                            }}
-                            className="w-full"
-                          >
-                            <NativeSelectOption value="expense">
-                              Despesa
-                            </NativeSelectOption>
-                            <NativeSelectOption value="income">
-                              Receita
-                            </NativeSelectOption>
-                          </NativeSelect>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="amount">Valor</Label>
+                          <Label htmlFor="investment-transfer-amount">
+                            Valor
+                          </Label>
                           <Input
-                            id="amount"
-                            name="amount"
+                            id="investment-transfer-amount"
+                            name="investmentAmount"
                             required
                             inputMode="decimal"
                             placeholder="R$ 0,00"
                             className="h-11"
                           />
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="category">Categoria</Label>
-                          <NativeSelect
-                            id="category"
-                            required
-                            value={selectedCategoryId}
-                            onChange={(event) =>
-                              setCategoryId(event.target.value)
-                            }
-                            className="w-full"
-                            disabled={!availableCategories.length}
-                          >
-                            {availableCategories.map((category) => (
-                              <NativeSelectOption
-                                key={category.id}
-                                value={String(category.id)}
-                              >
-                                {category.name}
-                              </NativeSelectOption>
-                            ))}
-                          </NativeSelect>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="transactionDate">Data</Label>
+                          <Label htmlFor="investment-transfer-date">Data</Label>
                           <Input
-                            id="transactionDate"
-                            name="transactionDate"
-                            required
+                            id="investment-transfer-date"
+                            name="investmentDate"
                             type="date"
+                            required
                             defaultValue={todayInBrazil()}
                             className="h-11"
                           />
                         </div>
                       </div>
 
-                      {(message || error) && (
+                      <div className="rounded-xl border border-foreground/10 bg-inverse/5 p-3 text-sm text-muted-foreground">
+                        Saldo livre consolidado (confira a conta de origem
+                        acima):{' '}
+                        {investmentAvailableBalanceCents === null
+                          ? 'consultando...'
+                          : formatCurrency(investmentAvailableBalanceCents)}
+                      </div>
+
+                      {investmentTransferError && (
                         <output
                           aria-live="polite"
-                          className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${error ? 'bg-destructive/10 text-destructive' : 'bg-inverse/10 text-foreground'}`}
-                        >
-                          {error && (
-                            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                          )}
-                          {error || message}
-                        </output>
-                      )}
-
-                      <Button
-                        type="submit"
-                        size="lg"
-                        disabled={saving || loading || !selectedCategoryId}
-                        className="h-11 w-full font-semibold"
-                      >
-                        {saving ? (
-                          <LoaderCircle className="animate-spin" />
-                        ) : (
-                          <Plus />
-                        )}
-                        {saving ? 'Registrando...' : 'Registrar transação'}
-                      </Button>
-                    </form>
-                  </CardContent>
-                </Card>
-
-                <Card className="min-h-[360px] border-0 shadow-[0_18px_50px_rgba(0,0,0,.2)] ring-1 ring-foreground/15">
-                  <CardHeader className="flex-row items-center justify-between border-b border-foreground/10 pb-4">
-                    <div>
-                      <CardTitle className="text-lg font-bold tracking-tight">
-                        Movimentações
-                      </CardTitle>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {loading
-                          ? 'Carregando o mês...'
-                          : searchActive
-                            ? 'Busca no histórico completo com os filtros abaixo'
-                            : `${data.transactions.length} ${data.transactions.length === 1 ? 'transação' : 'transações'} em ${monthLabel}`}
-                      </p>
-                    </div>
-                    <CalendarDays
-                      className="size-5 text-muted-foreground"
-                      aria-hidden="true"
-                    />
-                  </CardHeader>
-                  <CardContent className="px-0">
-                    <TransactionSearchPanel
-                      month={month}
-                      categories={data.categories}
-                      active={searchActive}
-                      onActiveChange={setSearchActive}
-                      refreshKey={budgetRefreshKey}
-                      onEdit={openTransactionEditor}
-                    />
-                    {!searchActive && (
-                      <>
-                        {loading ? (
-                          <div className="grid min-h-60 place-items-center text-muted-foreground">
-                            <LoaderCircle
-                              className="size-7 animate-spin"
-                              aria-label="Carregando transações"
-                            />
-                          </div>
-                        ) : loadError ? (
-                          <div className="grid min-h-60 place-items-center px-6 text-center">
-                            <div>
-                              <AlertCircle className="mx-auto mb-3 size-8 text-red-500" />
-                              <p className="font-medium">
-                                Não foi possível abrir suas movimentações
-                              </p>
-                              <Button
-                                variant="outline"
-                                className="mt-4"
-                                onClick={() => void loadData(month)}
-                              >
-                                Tentar novamente
-                              </Button>
-                            </div>
-                          </div>
-                        ) : data.transactions.length === 0 ? (
-                          <div className="grid min-h-60 place-items-center px-6 text-center">
-                            <div>
-                              <span className="mx-auto mb-3 grid size-12 place-items-center rounded-full bg-inverse/10 text-foreground">
-                                <ReceiptText />
-                              </span>
-                              <p className="font-semibold">
-                                Nenhuma movimentação neste mês
-                              </p>
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                Use o formulário para registrar sua primeira
-                                transação.
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="pl-5">Data</TableHead>
-                                <TableHead>Descrição</TableHead>
-                                <TableHead>Categoria</TableHead>
-                                <TableHead className="pr-5 text-right">
-                                  Valor
-                                </TableHead>
-                                <TableHead className="w-12 pr-5">
-                                  <span className="sr-only">Ações</span>
-                                </TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {data.transactions.map((transaction) => (
-                                <TableRow key={transaction.id}>
-                                  <TableCell className="pl-5 text-muted-foreground">
-                                    {dateFormatter.format(
-                                      new Date(
-                                        `${transaction.transactionDate}T00:00:00Z`,
-                                      ),
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="font-medium">
-                                    {transaction.description}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary">
-                                      {transaction.type === 'transfer'
-                                        ? 'Transferência · Investimentos'
-                                        : transaction.categoryName}
-                                      {' · '}
-                                      {transaction.accountName ??
-                                        'Conta principal'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right font-semibold text-foreground tabular-nums">
-                                    {transaction.type === 'income'
-                                      ? '+ '
-                                      : '− '}
-                                    {formatCurrency(transaction.amountCents)}
-                                  </TableCell>
-                                  <TableCell className="pr-5 text-right">
-                                    {transaction.type !== 'transfer' && (
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        aria-label={`Editar ${transaction.description}`}
-                                        onClick={() =>
-                                          openTransactionEditor(transaction)
-                                        }
-                                      >
-                                        <Pencil />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        )}
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              <BudgetsPanel
-                key={month}
-                month={month}
-                refreshKey={budgetRefreshKey}
-              />
-
-              <RecurringPanel
-                key={`recurring-${month}`}
-                month={month}
-                categories={data.categories}
-                refreshKey={budgetRefreshKey}
-                onConfirmed={async () => {
-                  await loadData(month);
-                }}
-              />
-
-              <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
-                <Button
-                  variant="outline"
-                  onClick={() => setActiveArea('settings')}
-                >
-                  <Settings /> Configurações e backup dos dados
-                </Button>
-              </div>
-
-              <Dialog
-                open={investmentTransferOpen}
-                onOpenChange={(open) => {
-                  if (!investmentTransferSaving)
-                    setInvestmentTransferOpen(open);
-                }}
-              >
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Novo investimento</DialogTitle>
-                    <DialogDescription>
-                      O valor será descontado do saldo da conta e creditado no
-                      saldo de investimentos.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form
-                    className="space-y-4"
-                    onSubmit={handleInvestmentTransfer}
-                  >
-                    <AccountSelect
-                      id="investment-account"
-                      name="investmentAccount"
-                      label="Conta de origem"
-                      showBalance
-                    />
-                    <div className="space-y-2">
-                      <Label htmlFor="investment-transfer-description">
-                        Descrição
-                      </Label>
-                      <Input
-                        id="investment-transfer-description"
-                        name="investmentDescription"
-                        required
-                        minLength={2}
-                        maxLength={80}
-                        defaultValue="Aplicação CDI/CDB"
-                        className="h-11"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="investment-transfer-amount">
-                          Valor
-                        </Label>
-                        <Input
-                          id="investment-transfer-amount"
-                          name="investmentAmount"
-                          required
-                          inputMode="decimal"
-                          placeholder="R$ 0,00"
-                          className="h-11"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="investment-transfer-date">Data</Label>
-                        <Input
-                          id="investment-transfer-date"
-                          name="investmentDate"
-                          type="date"
-                          required
-                          defaultValue={todayInBrazil()}
-                          className="h-11"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-foreground/10 bg-inverse/5 p-3 text-sm text-muted-foreground">
-                      Saldo livre consolidado (confira a conta de origem acima):{' '}
-                      {investmentAvailableBalanceCents === null
-                        ? 'consultando...'
-                        : formatCurrency(investmentAvailableBalanceCents)}
-                    </div>
-
-                    {investmentTransferError && (
-                      <output
-                        aria-live="polite"
-                        className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
-                      >
-                        <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                        {investmentTransferError}
-                      </output>
-                    )}
-
-                    <DialogFooter className="mx-0 mb-0 -mr-4 -ml-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={investmentTransferSaving}
-                        onClick={() => setInvestmentTransferOpen(false)}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={
-                          investmentTransferSaving ||
-                          investmentAvailableBalanceCents === null
-                        }
-                        className="bg-primary text-primary-foreground hover:bg-primary/90"
-                      >
-                        {investmentTransferSaving && (
-                          <LoaderCircle className="animate-spin" />
-                        )}
-                        {investmentTransferSaving
-                          ? 'Transferindo...'
-                          : 'Confirmar aporte'}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              <Dialog
-                open={editingTransaction !== null}
-                onOpenChange={(open) => {
-                  if (!open && !editSaving) setEditingTransaction(null);
-                }}
-              >
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Editar transação</DialogTitle>
-                    <DialogDescription>
-                      Ao salvar, o resumo do mês também será recalculado.
-                    </DialogDescription>
-                  </DialogHeader>
-                  {editingTransaction && (
-                    <form
-                      key={editingTransaction.id}
-                      className="space-y-4"
-                      onSubmit={handleEditSubmit}
-                    >
-                      <AccountSelect
-                        id="edit-account"
-                        name="editAccount"
-                        defaultValue={editingTransaction.accountId ?? null}
-                      />
-                      <div className="space-y-2">
-                        <Label htmlFor="edit-description">Descrição</Label>
-                        <Input
-                          id="edit-description"
-                          name="editDescription"
-                          required
-                          minLength={2}
-                          maxLength={120}
-                          defaultValue={editingTransaction.description}
-                          className="h-11"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-type">Tipo</Label>
-                          <NativeSelect
-                            id="edit-type"
-                            value={editType}
-                            onChange={(event) => {
-                              const nextType = event.target
-                                .value as TransactionType;
-                              setEditType(nextType);
-                              const firstCategory = data.categories.find(
-                                (category) => category.type === nextType,
-                              );
-                              setEditCategoryId(
-                                firstCategory ? String(firstCategory.id) : '',
-                              );
-                            }}
-                            className="w-full"
-                          >
-                            <NativeSelectOption value="expense">
-                              Despesa
-                            </NativeSelectOption>
-                            <NativeSelectOption value="income">
-                              Receita
-                            </NativeSelectOption>
-                          </NativeSelect>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-amount">Valor</Label>
-                          <Input
-                            id="edit-amount"
-                            name="editAmount"
-                            required
-                            inputMode="decimal"
-                            defaultValue={formatCurrencyInput(
-                              editingTransaction.amountCents,
-                            )}
-                            className="h-11"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-category">Categoria</Label>
-                          <NativeSelect
-                            id="edit-category"
-                            required
-                            value={selectedEditCategoryId}
-                            onChange={(event) =>
-                              setEditCategoryId(event.target.value)
-                            }
-                            className="w-full"
-                          >
-                            {editCategories.map((category) => (
-                              <NativeSelectOption
-                                key={category.id}
-                                value={String(category.id)}
-                              >
-                                {category.name}
-                              </NativeSelectOption>
-                            ))}
-                          </NativeSelect>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="edit-transaction-date">Data</Label>
-                          <Input
-                            id="edit-transaction-date"
-                            name="editTransactionDate"
-                            type="date"
-                            required
-                            defaultValue={editingTransaction.transactionDate}
-                            className="h-11"
-                          />
-                        </div>
-                      </div>
-
-                      {editError && (
-                        <output
-                          aria-live="polite"
-                          className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700"
+                          className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
                         >
                           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                          {editError}
+                          {investmentTransferError}
                         </output>
                       )}
 
@@ -1515,25 +1389,177 @@ export default function Home() {
                         <Button
                           type="button"
                           variant="outline"
-                          disabled={editSaving}
-                          onClick={() => setEditingTransaction(null)}
+                          disabled={investmentTransferSaving}
+                          onClick={() => setInvestmentTransferOpen(false)}
                         >
                           Cancelar
                         </Button>
                         <Button
                           type="submit"
-                          disabled={editSaving || !selectedEditCategoryId}
+                          disabled={
+                            investmentTransferSaving ||
+                            investmentAvailableBalanceCents === null
+                          }
+                          className="bg-primary text-primary-foreground hover:bg-primary/90"
                         >
-                          {editSaving && (
+                          {investmentTransferSaving && (
                             <LoaderCircle className="animate-spin" />
                           )}
-                          {editSaving ? 'Salvando...' : 'Salvar alterações'}
+                          {investmentTransferSaving
+                            ? 'Transferindo...'
+                            : 'Confirmar aporte'}
                         </Button>
                       </DialogFooter>
                     </form>
-                  )}
-                </DialogContent>
-              </Dialog>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog
+                  open={editingTransaction !== null}
+                  onOpenChange={(open) => {
+                    if (!open && !editSaving) setEditingTransaction(null);
+                  }}
+                >
+                  <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Editar transação</DialogTitle>
+                      <DialogDescription>
+                        Ao salvar, o resumo do mês também será recalculado.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {editingTransaction && (
+                      <form
+                        key={editingTransaction.id}
+                        className="space-y-4"
+                        onSubmit={handleEditSubmit}
+                      >
+                        <AccountSelect
+                          id="edit-account"
+                          name="editAccount"
+                          defaultValue={editingTransaction.accountId ?? null}
+                        />
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-description">Descrição</Label>
+                          <Input
+                            id="edit-description"
+                            name="editDescription"
+                            required
+                            minLength={2}
+                            maxLength={120}
+                            defaultValue={editingTransaction.description}
+                            className="h-11"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-type">Tipo</Label>
+                            <NativeSelect
+                              id="edit-type"
+                              value={editType}
+                              onChange={(event) => {
+                                const nextType = event.target
+                                  .value as TransactionType;
+                                setEditType(nextType);
+                                const firstCategory = data.categories.find(
+                                  (category) => category.type === nextType,
+                                );
+                                setEditCategoryId(
+                                  firstCategory ? String(firstCategory.id) : '',
+                                );
+                              }}
+                              className="w-full"
+                            >
+                              <NativeSelectOption value="expense">
+                                Despesa
+                              </NativeSelectOption>
+                              <NativeSelectOption value="income">
+                                Receita
+                              </NativeSelectOption>
+                            </NativeSelect>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-amount">Valor</Label>
+                            <Input
+                              id="edit-amount"
+                              name="editAmount"
+                              required
+                              inputMode="decimal"
+                              defaultValue={formatCurrencyInput(
+                                editingTransaction.amountCents,
+                              )}
+                              className="h-11"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-category">Categoria</Label>
+                            <NativeSelect
+                              id="edit-category"
+                              required
+                              value={selectedEditCategoryId}
+                              onChange={(event) =>
+                                setEditCategoryId(event.target.value)
+                              }
+                              className="w-full"
+                            >
+                              {editCategories.map((category) => (
+                                <NativeSelectOption
+                                  key={category.id}
+                                  value={String(category.id)}
+                                >
+                                  {category.name}
+                                </NativeSelectOption>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-transaction-date">Data</Label>
+                            <Input
+                              id="edit-transaction-date"
+                              name="editTransactionDate"
+                              type="date"
+                              required
+                              defaultValue={editingTransaction.transactionDate}
+                              className="h-11"
+                            />
+                          </div>
+                        </div>
+
+                        {editError && (
+                          <output
+                            aria-live="polite"
+                            className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700"
+                          >
+                            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                            {editError}
+                          </output>
+                        )}
+
+                        <DialogFooter className="mx-0 mb-0 -mr-4 -ml-4">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={editSaving}
+                            onClick={() => setEditingTransaction(null)}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={editSaving || !selectedEditCategoryId}
+                          >
+                            {editSaving && (
+                              <LoaderCircle className="animate-spin" />
+                            )}
+                            {editSaving ? 'Salvando...' : 'Salvar alterações'}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    )}
+                  </DialogContent>
+                </Dialog>
+              </BankArea>
             </TabsContent>
 
             <TabsContent value="accounts">
@@ -1544,11 +1570,15 @@ export default function Home() {
               <AccountsGoalsPanel mode="goals" />
             </TabsContent>
             <TabsContent value="investments">
-              <InvestmentsPanel />
+              <BankArea bankContent={<BankInvestmentsPanel />}>
+                <InvestmentsPanel />
+              </BankArea>
             </TabsContent>
 
             <TabsContent value="credit-cards">
-              <CreditCardsPanel />
+              <BankArea bankContent={<BankCardsPanel />}>
+                <CreditCardsPanel />
+              </BankArea>
             </TabsContent>
 
             <TabsContent value="simulations">
