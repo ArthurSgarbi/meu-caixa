@@ -766,6 +766,290 @@ test('card purchases stay private and installments preserve every cent', async (
   assert.deepEqual((await afterCardRemoval.json()).cards, []);
 });
 
+test('card edits persist, recalculate limits and preserve issued invoices and purchases', async () => {
+  currentOwner = 'test-owner-a';
+  const input = {
+    action: 'create_card',
+    name: 'Principal',
+    brand: 'Visa',
+    lastFour: '0095',
+    creditLimitCents: 50_000,
+    closingDay: 15,
+    dueDay: 25,
+  };
+  const create = await cardsRoute.POST(
+    jsonRequest('/api/credit-cards', 'POST', input),
+  );
+  const cardId = (await create.json()).id;
+  await cardsRoute.POST(
+    jsonRequest('/api/credit-cards', 'POST', {
+      action: 'create_purchase',
+      cardId,
+      description: 'Compra original',
+      totalAmountCents: 10_001,
+      installmentCount: 3,
+      purchaseDate: '2026-09-28',
+    }),
+  );
+  const originalInvoices = (
+    await pg.query('SELECT * FROM credit_card_invoices ORDER BY id')
+  ).rows;
+  const originalPurchases = (
+    await pg.query('SELECT * FROM credit_card_transactions ORDER BY id')
+  ).rows;
+  const edit = {
+    ...input,
+    action: 'update_card',
+    cardId,
+    name: 'Principal corrigido',
+    brand: 'Mastercard',
+    lastFour: '0042',
+    creditLimitCents: 60_000,
+    closingDay: 10,
+    dueDay: 20,
+  };
+  currentOwner = null;
+  assert.equal(
+    (await cardsRoute.PATCH(jsonRequest('/api/credit-cards', 'PATCH', edit)))
+      .status,
+    401,
+  );
+  currentOwner = 'test-owner-b';
+  assert.equal(
+    (await cardsRoute.PATCH(jsonRequest('/api/credit-cards', 'PATCH', edit)))
+      .status,
+    404,
+  );
+  currentOwner = 'test-owner-a';
+  assert.equal(
+    (await cardsRoute.PATCH(jsonRequest('/api/credit-cards', 'PATCH', edit)))
+      .status,
+    200,
+  );
+  const view = await (
+    await cardsRoute.GET(
+      new Request(
+        `https://local.test/api/credit-cards?month=2026-10&cardId=${cardId}`,
+      ),
+    )
+  ).json();
+  assert.deepEqual(view.selectedCard, {
+    id: cardId,
+    name: edit.name,
+    brand: edit.brand,
+    lastFour: edit.lastFour,
+    creditLimitCents: 60_000,
+    closingDay: 10,
+    dueDay: 20,
+  });
+  assert.equal(view.summary.availableCents, 49_999);
+  assert.deepEqual(
+    (await pg.query('SELECT * FROM credit_card_invoices ORDER BY id')).rows,
+    originalInvoices,
+  );
+  assert.deepEqual(
+    (await pg.query('SELECT * FROM credit_card_transactions ORDER BY id')).rows,
+    originalPurchases,
+  );
+  for (const invalid of [
+    { creditLimitCents: 0 },
+    { creditLimitCents: 2_147_483_648 },
+    { closingDay: 0 },
+    { dueDay: 29 },
+    { lastFour: '42' },
+    { cardId: -1 },
+  ]) {
+    assert.equal(
+      (
+        await cardsRoute.PATCH(
+          jsonRequest('/api/credit-cards', 'PATCH', { ...edit, ...invalid }),
+        )
+      ).status,
+      400,
+    );
+  }
+  await cardsRoute.POST(
+    jsonRequest('/api/credit-cards', 'POST', { ...input, name: 'Outro' }),
+  );
+  assert.equal(
+    (
+      await cardsRoute.PATCH(
+        jsonRequest('/api/credit-cards', 'PATCH', { ...edit, name: 'Outro' }),
+      )
+    ).status,
+    409,
+  );
+  for (const method of ['PATCH', 'DELETE']) {
+    for (const invalid of [null, [], { action: 'invalid' }]) {
+      assert.equal(
+        (
+          await cardsRoute[method](
+            jsonRequest('/api/credit-cards', method, invalid),
+          )
+        ).status,
+        400,
+      );
+    }
+    assert.equal(
+      (
+        await cardsRoute[method](
+          new Request('https://local.test/api/credit-cards', {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: '{',
+          }),
+        )
+      ).status,
+      400,
+    );
+  }
+  await cardsRoute.POST(
+    jsonRequest('/api/credit-cards', 'POST', {
+      action: 'create_purchase',
+      cardId,
+      description: 'Compra após alteração',
+      totalAmountCents: 100,
+      installmentCount: 1,
+      purchaseDate: '2027-01-11',
+    }),
+  );
+  const newInvoice = await (
+    await cardsRoute.GET(
+      new Request(
+        `https://local.test/api/credit-cards?month=2027-02&cardId=${cardId}`,
+      ),
+    )
+  ).json();
+  assert.equal(newInvoice.invoice.closingDate, '2027-02-10');
+  assert.equal(newInvoice.invoice.dueDate, '2027-02-20');
+});
+
+test('card removal deletes paid and future invoices atomically while retaining other cards and owners', async () => {
+  const cardIds = [];
+  for (const [owner, name] of [
+    ['test-owner-a', 'Apagar'],
+    ['test-owner-a', 'Manter'],
+    ['test-owner-b', 'Manter B'],
+  ]) {
+    currentOwner = owner;
+    const created = await cardsRoute.POST(
+      jsonRequest('/api/credit-cards', 'POST', {
+        action: 'create_card',
+        name,
+        brand: 'Visa',
+        lastFour: '0095',
+        creditLimitCents: 50_000,
+        closingDay: 15,
+        dueDay: 25,
+      }),
+    );
+    const cardId = (await created.json()).id;
+    cardIds.push(cardId);
+    await cardsRoute.POST(
+      jsonRequest('/api/credit-cards', 'POST', {
+        action: 'create_purchase',
+        cardId,
+        description: 'Compra parcelada',
+        totalAmountCents: 10_001,
+        installmentCount: 3,
+        purchaseDate: '2026-09-28',
+      }),
+    );
+    const view = await (
+      await cardsRoute.GET(
+        new Request(
+          `https://local.test/api/credit-cards?month=2026-10&cardId=${cardId}`,
+        ),
+      )
+    ).json();
+    await cardsRoute.PATCH(
+      jsonRequest('/api/credit-cards', 'PATCH', {
+        invoiceId: view.invoice.id,
+        status: 'paid',
+      }),
+    );
+  }
+  const [cardId] = cardIds;
+  const preserved = {};
+  for (const table of [
+    'credit_cards',
+    'credit_card_invoices',
+    'credit_card_transactions',
+  ]) {
+    preserved[table] = (
+      await pg.query(
+        `SELECT * FROM ${table} WHERE ${table === 'credit_cards' ? 'id' : 'card_id'} != $1 ORDER BY id`,
+        [cardId],
+      )
+    ).rows;
+  }
+  currentOwner = null;
+  assert.equal(
+    (
+      await cardsRoute.DELETE(
+        jsonRequest('/api/credit-cards', 'DELETE', {
+          action: 'delete_card',
+          cardId,
+        }),
+      )
+    ).status,
+    401,
+  );
+  currentOwner = 'test-owner-b';
+  assert.equal(
+    (
+      await cardsRoute.DELETE(
+        jsonRequest('/api/credit-cards', 'DELETE', {
+          action: 'delete_card',
+          cardId,
+        }),
+      )
+    ).status,
+    404,
+  );
+  currentOwner = 'test-owner-a';
+  assert.equal(
+    (
+      await cardsRoute.DELETE(
+        jsonRequest('/api/credit-cards', 'DELETE', {
+          action: 'delete_card',
+          cardId,
+        }),
+      )
+    ).status,
+    200,
+  );
+  for (const table of [
+    'credit_cards',
+    'credit_card_invoices',
+    'credit_card_transactions',
+  ]) {
+    assert.deepEqual(
+      (await pg.query(`SELECT * FROM ${table} ORDER BY id`)).rows,
+      preserved[table],
+    );
+  }
+  assert.equal(
+    (
+      await cardsRoute.DELETE(
+        jsonRequest('/api/credit-cards', 'DELETE', {
+          action: 'delete_card',
+          cardId,
+        }),
+      )
+    ).status,
+    404,
+  );
+  const selected = await (
+    await cardsRoute.GET(
+      new Request(
+        `https://local.test/api/credit-cards?month=2026-10&cardId=${cardId}`,
+      ),
+    )
+  ).json();
+  assert.equal(selected.selectedCard.id, cardIds[1]);
+});
+
 test('investment assets, recurring rules and simulations are owner-scoped', async () => {
   const categories = await categoryIds();
   currentOwner = 'test-owner-a';

@@ -157,14 +157,14 @@ export function CreditCardsPanel() {
 
   const beginCardsRequest = useLatestRequest();
   const loadCards = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, cardId = selectedCardId) => {
       signal = beginCardsRequest(signal).signal;
       if (signal.aborted) return;
       setLoading(true);
       setLoadError('');
       setError('');
       const params = new URLSearchParams({ month: selectedMonth });
-      if (selectedCardId) params.set('cardId', selectedCardId);
+      if (cardId) params.set('cardId', cardId);
 
       try {
         const response = await apiFetch(`/api/credit-cards?${params}`, {
@@ -180,9 +180,9 @@ export function CreditCardsPanel() {
         }
         if (signal.aborted) return;
         setData(result);
-        if (!selectedCardId && result.selectedCard) {
-          setSelectedCardId(String(result.selectedCard.id));
-        }
+        setSelectedCardId(
+          result.selectedCard ? String(result.selectedCard.id) : '',
+        );
       } catch (requestError) {
         if (signal.aborted) return;
         if (
@@ -276,7 +276,7 @@ export function CreditCardsPanel() {
 
   async function updateCard(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!data.selectedCard) return;
+    if (!data.selectedCard || saving || invoiceSaving || loading) return;
     const form = new FormData(event.currentTarget);
     const creditLimitCents = parseCurrencyToCents(
       formString(form.get('creditLimit')),
@@ -322,7 +322,7 @@ export function CreditCardsPanel() {
   }
 
   async function deleteCard() {
-    if (!data.selectedCard) return;
+    if (!data.selectedCard || saving || invoiceSaving || loading) return;
     setSaving(true);
     setError('');
     setMessage('');
@@ -340,11 +340,10 @@ export function CreditCardsPanel() {
         throw new Error(result.error ?? 'Não foi possível remover o cartão.');
       }
       setDeleteCardOpen(false);
-      setSelectedCardId('');
       setMessage(
         'Cartão removido. As faturas e compras vinculadas também foram removidas.',
       );
-      await loadCards();
+      await loadCards(undefined, '');
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -466,8 +465,12 @@ export function CreditCardsPanel() {
                 <NativeSelect
                   aria-label="Selecionar cartão"
                   value={selectedCardId}
-                  disabled={saving || invoiceSaving}
-                  onChange={(event) => setSelectedCardId(event.target.value)}
+                  disabled={saving || invoiceSaving || loading}
+                  onChange={(event) => {
+                    setLoading(true);
+                    setMessage('');
+                    setSelectedCardId(event.target.value);
+                  }}
                   className="min-w-48 border-foreground/15 bg-card/90 text-foreground"
                 >
                   {data.cards.map((card) => (
@@ -479,6 +482,7 @@ export function CreditCardsPanel() {
               )}
               <Button
                 type="button"
+                disabled={saving || invoiceSaving || loading}
                 onClick={() => {
                   setError('');
                   setMessage('');
@@ -499,7 +503,7 @@ export function CreditCardsPanel() {
                       setMessage('');
                       setEditCardOpen(true);
                     }}
-                    disabled={saving || invoiceSaving}
+                    disabled={saving || invoiceSaving || loading || !!loadError}
                   >
                     <Pencil /> Editar
                   </Button>
@@ -512,7 +516,7 @@ export function CreditCardsPanel() {
                       setMessage('');
                       setDeleteCardOpen(true);
                     }}
-                    disabled={saving || invoiceSaving}
+                    disabled={saving || invoiceSaving || loading || !!loadError}
                     className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
                     <Trash2 /> Remover
@@ -604,6 +608,15 @@ export function CreditCardsPanel() {
         </div>
       </header>
 
+      {message && !newCardOpen && !editCardOpen && !deleteCardOpen && (
+        <output
+          aria-live="polite"
+          className="mx-auto mt-5 block max-w-7xl px-5 text-sm text-foreground sm:px-8 lg:px-10"
+        >
+          {message}
+        </output>
+      )}
+
       {data.selectedCard && !loading && !loadError && (
         <div className="mx-auto grid max-w-7xl gap-6 px-5 pt-8 sm:px-8 lg:grid-cols-[360px_minmax(0,1fr)] lg:px-10">
           <Card className="h-fit border-0 shadow-[0_18px_50px_rgba(0,0,0,.22)] ring-1 ring-foreground/15">
@@ -666,7 +679,7 @@ export function CreditCardsPanel() {
                     className="h-11"
                   />
                 </div>
-                {(message || error) && (
+                {error && (
                   <output
                     aria-live="polite"
                     className={`flex items-start gap-2 rounded-lg px-3 py-2.5 text-sm ${
@@ -678,7 +691,7 @@ export function CreditCardsPanel() {
                     {error && (
                       <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     )}
-                    {error || message}
+                    {error}
                   </output>
                 )}
                 <Button
@@ -755,7 +768,8 @@ export function CreditCardsPanel() {
                       !data.invoice?.id ||
                       data.summary.invoiceCents === 0 ||
                       loading ||
-                      invoiceSaving
+                      invoiceSaving ||
+                      saving
                     }
                     onClick={() => void toggleInvoicePayment()}
                     className="w-full"
@@ -946,18 +960,30 @@ export function CreditCardsPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editCardOpen} onOpenChange={setEditCardOpen}>
-        <DialogContent className="sm:max-w-lg">
+      <Dialog
+        open={editCardOpen}
+        onOpenChange={(open) => {
+          if (!saving) setEditCardOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg" showCloseButton={!saving}>
           <DialogHeader>
             <DialogTitle>Editar cartão de crédito</DialogTitle>
             <DialogDescription>
-              Atualize os dados do cartão selecionado. As compras já lançadas
-              serão preservadas.
+              Atualize os dados do cartão selecionado. Novos dias de fechamento
+              e vencimento valem para faturas criadas daqui em diante; as
+              faturas já lançadas mantêm suas datas e compras.
             </DialogDescription>
           </DialogHeader>
           {data.selectedCard && (
-            <form className="space-y-4" onSubmit={updateCard}>
-              <CardFields card={data.selectedCard} />
+            <form
+              key={`${data.selectedCard.id}-${editCardOpen}`}
+              className="space-y-4"
+              onSubmit={updateCard}
+            >
+              <fieldset disabled={saving} className="space-y-4">
+                <CardFields card={data.selectedCard} />
+              </fieldset>
               {error && (
                 <output
                   aria-live="polite"
@@ -986,13 +1012,18 @@ export function CreditCardsPanel() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={deleteCardOpen} onOpenChange={setDeleteCardOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        open={deleteCardOpen}
+        onOpenChange={(open) => {
+          if (!saving) setDeleteCardOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-md" showCloseButton={!saving}>
           <DialogHeader>
             <DialogTitle>Remover cartão?</DialogTitle>
             <DialogDescription>
               {data.selectedCard
-                ? `O cartão “${data.selectedCard.name}” e todas as suas faturas e compras serão removidos. Esta ação não pode ser desfeita.`
+                ? `O cartão “${data.selectedCard.name}”, final ${data.selectedCard.lastFour}, e todas as suas faturas e compras serão removidos. Esta ação não pode ser desfeita.`
                 : 'O cartão selecionado e seus lançamentos serão removidos.'}
             </DialogDescription>
           </DialogHeader>
@@ -1052,6 +1083,8 @@ function CardFields({ card }: { card: CreditCardData }) {
             id="edit-card-brand"
             name="brand"
             required
+            minLength={2}
+            maxLength={30}
             defaultValue={card.brand}
           />
         </div>

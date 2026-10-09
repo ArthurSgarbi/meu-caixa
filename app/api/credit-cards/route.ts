@@ -36,8 +36,12 @@ function parseCardInput(
   if (!/^\d{4}$/.test(lastFour)) {
     return { error: 'Informe os quatro últimos números do cartão.' };
   }
-  if (!Number.isSafeInteger(creditLimitCents) || creditLimitCents <= 0) {
-    return { error: 'Informe um limite maior que zero.' };
+  if (
+    !Number.isSafeInteger(creditLimitCents) ||
+    creditLimitCents <= 0 ||
+    creditLimitCents > 2_147_483_647
+  ) {
+    return { error: 'Informe um limite entre R$ 0,01 e R$ 21.474.836,47.' };
   }
   if (!Number.isInteger(closingDay) || closingDay < 1 || closingDay > 28) {
     return { error: 'O fechamento deve estar entre os dias 1 e 28.' };
@@ -450,11 +454,14 @@ export async function PATCH(request: Request) {
     const user = await getChatGPTUser();
     if (!user) {
       return Response.json(
-        { error: 'Entre na sua conta para atualizar a fatura.' },
+        { error: 'Entre na sua conta para atualizar os dados do cartão.' },
         { status: 401 },
       );
     }
     const body = (await request.json()) as Record<string, unknown>;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return Response.json({ error: 'Dados inválidos.' }, { status: 400 });
+    }
     if (body.action === 'update_card') {
       const cardId = Number(body.cardId);
       const parsed = parseCardInput(body);
@@ -492,6 +499,9 @@ export async function PATCH(request: Request) {
       }
       return Response.json({ id: cardId, updated: true });
     }
+    if (body.action !== undefined) {
+      return Response.json({ error: 'Ação inválida.' }, { status: 400 });
+    }
     const invoiceId = Number(body.invoiceId);
     const status = body.status;
     if (
@@ -527,9 +537,23 @@ export async function PATCH(request: Request) {
     }
     return Response.json({ id: invoiceId, status });
   } catch (error) {
-    console.error('Failed to update invoice', error);
+    if (error instanceof SyntaxError) {
+      return Response.json({ error: 'Dados inválidos.' }, { status: 400 });
+    }
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505'
+    ) {
+      return Response.json(
+        { error: 'Já existe um cartão com esse nome.' },
+        { status: 409 },
+      );
+    }
+    console.error('Failed to update card data', error);
     return Response.json(
-      { error: 'Não foi possível atualizar a fatura.' },
+      { error: 'Não foi possível atualizar os dados do cartão.' },
       { status: 500 },
     );
   }
@@ -540,43 +564,35 @@ export async function DELETE(request: Request) {
     const user = await getChatGPTUser();
     if (!user) {
       return Response.json(
-        { error: 'Entre na sua conta para excluir uma compra.' },
+        { error: 'Entre na sua conta para remover os dados do cartão.' },
         { status: 401 },
       );
     }
     const body = (await request.json()) as Record<string, unknown>;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return Response.json({ error: 'Dados inválidos.' }, { status: 400 });
+    }
     if (body.action === 'delete_card') {
       const cardId = Number(body.cardId);
       if (!Number.isSafeInteger(cardId) || cardId <= 0) {
         return Response.json({ error: 'Cartão inválido.' }, { status: 400 });
       }
-      const db = getDb();
-      const card = await db
-        .prepare('SELECT id FROM credit_cards WHERE id = ? AND owner_id = ?')
+      // As chaves estrangeiras ON DELETE CASCADE removem faturas/compras
+      // na mesma operação atômica, somente após validar o dono do cartão.
+      const result = await getDb()
+        .prepare('DELETE FROM credit_cards WHERE id = ? AND owner_id = ?')
         .bind(cardId, user.userId)
-        .first();
-      if (!card) {
+        .run();
+      if (result.meta.changes === 0) {
         return Response.json(
           { error: 'Cartão não encontrado.' },
           { status: 404 },
         );
       }
-      await db.batch([
-        db
-          .prepare(
-            'DELETE FROM credit_card_transactions WHERE card_id = ? AND owner_id = ?',
-          )
-          .bind(cardId, user.userId),
-        db
-          .prepare(
-            'DELETE FROM credit_card_invoices WHERE card_id = ? AND owner_id = ?',
-          )
-          .bind(cardId, user.userId),
-        db
-          .prepare('DELETE FROM credit_cards WHERE id = ? AND owner_id = ?')
-          .bind(cardId, user.userId),
-      ]);
       return Response.json({ deleted: true });
+    }
+    if (body.action !== undefined) {
+      return Response.json({ error: 'Ação inválida.' }, { status: 400 });
     }
     const purchaseGroupId =
       typeof body.purchaseGroupId === 'string' ? body.purchaseGroupId : '';
@@ -611,9 +627,12 @@ export async function DELETE(request: Request) {
       .run();
     return Response.json({ deleted: true });
   } catch (error) {
-    console.error('Failed to delete card purchase', error);
+    if (error instanceof SyntaxError) {
+      return Response.json({ error: 'Dados inválidos.' }, { status: 400 });
+    }
+    console.error('Failed to delete card data', error);
     return Response.json(
-      { error: 'Não foi possível excluir a compra.' },
+      { error: 'Não foi possível remover os dados do cartão.' },
       { status: 500 },
     );
   }
