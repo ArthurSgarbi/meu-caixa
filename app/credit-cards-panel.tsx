@@ -20,9 +20,11 @@ import {
   CreditCard,
   Landmark,
   LoaderCircle,
+  Pencil,
   Plus,
   ReceiptText,
   ShieldCheck,
+  Trash2,
   WalletCards,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -147,6 +149,8 @@ export function CreditCardsPanel() {
   const [saving, setSaving] = useState(false);
   const [invoiceSaving, setInvoiceSaving] = useState(false);
   const [newCardOpen, setNewCardOpen] = useState(false);
+  const [editCardOpen, setEditCardOpen] = useState(false);
+  const [deleteCardOpen, setDeleteCardOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -264,6 +268,88 @@ export function CreditCardsPanel() {
         requestError instanceof Error
           ? requestError.message
           : 'Não foi possível criar o cartão.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function updateCard(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!data.selectedCard) return;
+    const form = new FormData(event.currentTarget);
+    const creditLimitCents = parseCurrencyToCents(
+      formString(form.get('creditLimit')),
+    );
+    if (!Number.isSafeInteger(creditLimitCents) || creditLimitCents <= 0) {
+      setError('Informe um limite válido maior que zero.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await apiFetch('/api/credit-cards', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_card',
+          cardId: data.selectedCard.id,
+          name: formString(form.get('cardName')),
+          brand: formString(form.get('brand')),
+          lastFour: formString(form.get('lastFour')),
+          creditLimitCents,
+          closingDay: Number(formString(form.get('closingDay'))),
+          dueDay: Number(formString(form.get('dueDay'))),
+        }),
+      });
+      const result = (await readApiJson(response)) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Não foi possível atualizar o cartão.');
+      }
+      setEditCardOpen(false);
+      setMessage('Informações do cartão atualizadas.');
+      await loadCards();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível atualizar o cartão.',
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteCard() {
+    if (!data.selectedCard) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await apiFetch('/api/credit-cards', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete_card',
+          cardId: data.selectedCard.id,
+        }),
+      });
+      const result = (await readApiJson(response)) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error ?? 'Não foi possível remover o cartão.');
+      }
+      setDeleteCardOpen(false);
+      setSelectedCardId('');
+      setMessage(
+        'Cartão removido. As faturas e compras vinculadas também foram removidas.',
+      );
+      await loadCards();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Não foi possível remover o cartão.',
       );
     } finally {
       setSaving(false);
@@ -402,6 +488,37 @@ export function CreditCardsPanel() {
               >
                 <Plus /> Novo cartão
               </Button>
+              {data.selectedCard && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label="Editar cartão selecionado"
+                    onClick={() => {
+                      setError('');
+                      setMessage('');
+                      setEditCardOpen(true);
+                    }}
+                    disabled={saving || invoiceSaving}
+                  >
+                    <Pencil /> Editar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label="Remover cartão selecionado"
+                    onClick={() => {
+                      setError('');
+                      setMessage('');
+                      setDeleteCardOpen(true);
+                    }}
+                    disabled={saving || invoiceSaving}
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 /> Remover
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -828,7 +945,166 @@ export function CreditCardsPanel() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={editCardOpen} onOpenChange={setEditCardOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar cartão de crédito</DialogTitle>
+            <DialogDescription>
+              Atualize os dados do cartão selecionado. As compras já lançadas
+              serão preservadas.
+            </DialogDescription>
+          </DialogHeader>
+          {data.selectedCard && (
+            <form className="space-y-4" onSubmit={updateCard}>
+              <CardFields card={data.selectedCard} />
+              {error && (
+                <output
+                  aria-live="polite"
+                  className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  {error}
+                </output>
+              )}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditCardOpen(false)}
+                  disabled={saving}
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving && <LoaderCircle className="animate-spin" />}
+                  Salvar alterações
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteCardOpen} onOpenChange={setDeleteCardOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remover cartão?</DialogTitle>
+            <DialogDescription>
+              {data.selectedCard
+                ? `O cartão “${data.selectedCard.name}” e todas as suas faturas e compras serão removidos. Esta ação não pode ser desfeita.`
+                : 'O cartão selecionado e seus lançamentos serão removidos.'}
+            </DialogDescription>
+          </DialogHeader>
+          {error && (
+            <output
+              aria-live="polite"
+              className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              {error}
+            </output>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteCardOpen(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void deleteCard()}
+              disabled={saving}
+            >
+              {saving && <LoaderCircle className="animate-spin" />}
+              Remover cartão
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+function CardFields({ card }: { card: CreditCardData }) {
+  const limit = (card.creditLimitCents / 100).toFixed(2).replace('.', ',');
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="edit-card-name">Nome do cartão</Label>
+        <Input
+          id="edit-card-name"
+          name="cardName"
+          required
+          minLength={2}
+          maxLength={50}
+          defaultValue={card.name}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="edit-card-brand">Bandeira</Label>
+          <Input
+            id="edit-card-brand"
+            name="brand"
+            required
+            defaultValue={card.brand}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-card-last-four">Últimos 4 números</Label>
+          <Input
+            id="edit-card-last-four"
+            name="lastFour"
+            required
+            inputMode="numeric"
+            pattern="\d{4}"
+            maxLength={4}
+            defaultValue={card.lastFour}
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-card-limit">Limite total</Label>
+        <Input
+          id="edit-card-limit"
+          name="creditLimit"
+          required
+          inputMode="decimal"
+          defaultValue={limit}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-2">
+          <Label htmlFor="edit-closing-day">Dia do fechamento</Label>
+          <Input
+            id="edit-closing-day"
+            name="closingDay"
+            required
+            type="number"
+            min={1}
+            max={28}
+            defaultValue={card.closingDay}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="edit-due-day">Dia do vencimento</Label>
+          <Input
+            id="edit-due-day"
+            name="dueDay"
+            required
+            type="number"
+            min={1}
+            max={28}
+            defaultValue={card.dueDay}
+          />
+        </div>
+      </div>
+    </>
   );
 }
 

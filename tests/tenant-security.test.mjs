@@ -729,6 +729,41 @@ test('card purchases stay private and installments preserve every cent', async (
     ),
   );
   assert.equal((await afterPayment.json()).summary.availableCents, 13_333);
+
+  currentOwner = 'test-owner-b';
+  const editedOwnCard = await cardsRoute.PATCH(
+    jsonRequest('/api/credit-cards', 'PATCH', {
+      action: 'update_card',
+      cardId: ownCardIdB,
+      name: 'Cartão B atualizado',
+      brand: 'Mastercard',
+      lastFour: '5678',
+      creditLimitCents: 40_000,
+      closingDay: 12,
+      dueDay: 22,
+    }),
+  );
+  assert.equal(editedOwnCard.status, 200);
+  const deleteForeignCard = await cardsRoute.DELETE(
+    jsonRequest('/api/credit-cards', 'DELETE', {
+      action: 'delete_card',
+      cardId,
+    }),
+  );
+  assert.equal(deleteForeignCard.status, 404);
+
+  currentOwner = 'test-owner-a';
+  const deletedOwnCard = await cardsRoute.DELETE(
+    jsonRequest('/api/credit-cards', 'DELETE', {
+      action: 'delete_card',
+      cardId,
+    }),
+  );
+  assert.equal(deletedOwnCard.status, 200);
+  const afterCardRemoval = await cardsRoute.GET(
+    new Request('https://local.test/api/credit-cards?month=2026-10'),
+  );
+  assert.deepEqual((await afterCardRemoval.json()).cards, []);
 });
 
 test('investment assets, recurring rules and simulations are owner-scoped', async () => {

@@ -455,6 +455,43 @@ export async function PATCH(request: Request) {
       );
     }
     const body = (await request.json()) as Record<string, unknown>;
+    if (body.action === 'update_card') {
+      const cardId = Number(body.cardId);
+      const parsed = parseCardInput(body);
+      if (!Number.isSafeInteger(cardId) || cardId <= 0) {
+        return Response.json({ error: 'Cartão inválido.' }, { status: 400 });
+      }
+      if ('error' in parsed) {
+        return Response.json({ error: parsed.error }, { status: 400 });
+      }
+      const input = parsed.input;
+      const result = await getDb()
+        .prepare(
+          `UPDATE credit_cards
+              SET name = ?, brand = ?, last_four = ?, credit_limit_cents = ?,
+                  closing_day = ?, due_day = ?, updated_at = ?
+            WHERE id = ? AND owner_id = ?`,
+        )
+        .bind(
+          input.name,
+          input.brand,
+          input.lastFour,
+          input.creditLimitCents,
+          input.closingDay,
+          input.dueDay,
+          new Date().toISOString(),
+          cardId,
+          user.userId,
+        )
+        .run();
+      if (result.meta.changes === 0) {
+        return Response.json(
+          { error: 'Cartão não encontrado.' },
+          { status: 404 },
+        );
+      }
+      return Response.json({ id: cardId, updated: true });
+    }
     const invoiceId = Number(body.invoiceId);
     const status = body.status;
     if (
@@ -508,6 +545,39 @@ export async function DELETE(request: Request) {
       );
     }
     const body = (await request.json()) as Record<string, unknown>;
+    if (body.action === 'delete_card') {
+      const cardId = Number(body.cardId);
+      if (!Number.isSafeInteger(cardId) || cardId <= 0) {
+        return Response.json({ error: 'Cartão inválido.' }, { status: 400 });
+      }
+      const db = getDb();
+      const card = await db
+        .prepare('SELECT id FROM credit_cards WHERE id = ? AND owner_id = ?')
+        .bind(cardId, user.userId)
+        .first();
+      if (!card) {
+        return Response.json(
+          { error: 'Cartão não encontrado.' },
+          { status: 404 },
+        );
+      }
+      await db.batch([
+        db
+          .prepare(
+            'DELETE FROM credit_card_transactions WHERE card_id = ? AND owner_id = ?',
+          )
+          .bind(cardId, user.userId),
+        db
+          .prepare(
+            'DELETE FROM credit_card_invoices WHERE card_id = ? AND owner_id = ?',
+          )
+          .bind(cardId, user.userId),
+        db
+          .prepare('DELETE FROM credit_cards WHERE id = ? AND owner_id = ?')
+          .bind(cardId, user.userId),
+      ]);
+      return Response.json({ deleted: true });
+    }
     const purchaseGroupId =
       typeof body.purchaseGroupId === 'string' ? body.purchaseGroupId : '';
     if (!purchaseGroupId) {
